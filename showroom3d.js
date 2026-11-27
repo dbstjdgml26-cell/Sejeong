@@ -1140,22 +1140,54 @@ export function createShowroom(opts = {}) {
     const g = new THREE.Group();
     g.position.set(x, 0, z);
     g.scale.setScalar(s);
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3826, roughness: 0.9 });
-    let prevY = 0;
-    for (let i = 0; i < 5; i++) {
-      const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.11 - i * 0.012, 0.13 - i * 0.012, 0.55, 8), trunkMat);
-      seg.position.set(Math.sin(i * 0.35) * 0.12, prevY + 0.27, 0);
-      seg.rotation.z = Math.sin(i * 0.35) * 0.08;
-      g.add(seg);
-      prevY += 0.5;
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a432c, roughness: 0.92 });
+    const H = 2.15;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.17, H, 12), trunkMat);
+    trunk.position.set(0, H / 2, 0);
+    trunk.rotation.z = 0.055;
+    g.add(trunk);
+    // ringed trunk detail
+    for (let i = 1; i < 6; i++) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.135 - i * 0.008, 0.018, 6, 14), trunkMat);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(Math.sin(0.055) * (i / 6) * H, (i / 6) * H, 0);
+      g.add(ring);
     }
-    const leafMat = new THREE.MeshStandardMaterial({ color: 0x257d55, roughness: 0.7, side: THREE.DoubleSide });
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * TAU;
-      const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.2, 1.9, 4, 1, true), leafMat);
-      leaf.position.set(Math.sin(0.5) * 0.12 + Math.cos(a) * 0.6, prevY + 0.25, Math.sin(a) * 0.6);
-      leaf.rotation.set(Math.cos(a) * 0.85, -a, Math.sin(a) * 0.85);
-      g.add(leaf);
+    const crown = new THREE.Group();
+    crown.position.set(Math.sin(0.055) * H, H - 0.04, 0);
+    g.add(crown);
+    const nut = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), new THREE.MeshStandardMaterial({ color: 0x3f3020, roughness: 0.9 }));
+    crown.add(nut);
+
+    // one drooping frond geometry, reused for every leaf
+    const len = 1.75;
+    const frondGeo = new THREE.PlaneGeometry(0.42, len, 1, 8);
+    const pos = frondGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const py = pos.getY(i) + len / 2;          // 0 at base, len at tip
+      const t = py / len;
+      pos.setX(i, pos.getX(i) * (1 - Math.pow(t, 1.6) * 0.85));
+      pos.setZ(i, -Math.pow(t, 2) * 0.95);
+      pos.setY(i, py);
+    }
+    frondGeo.computeVertexNormals();
+
+    const leafMat = new THREE.MeshStandardMaterial({
+      color: 0x2c8f61, roughness: 0.72, metalness: 0.04, side: THREE.DoubleSide,
+      emissive: 0x08251a
+    });
+    const leafDark = new THREE.MeshStandardMaterial({
+      color: 0x1f7050, roughness: 0.75, metalness: 0.04, side: THREE.DoubleSide,
+      emissive: 0x061c14
+    });
+    for (let i = 0; i < 9; i++) {
+      const holder = new THREE.Group();
+      holder.rotation.y = (i / 9) * TAU + rand(-0.12, 0.12);
+      const leaf = new THREE.Mesh(frondGeo, i % 2 ? leafMat : leafDark);
+      leaf.rotation.x = -1.02 + rand(-0.1, 0.1);
+      leaf.scale.setScalar(rand(0.85, 1.08));
+      holder.add(leaf);
+      crown.add(holder);
     }
     seasonGroup.add(g);
     return g;
