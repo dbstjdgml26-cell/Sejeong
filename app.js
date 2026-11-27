@@ -44,9 +44,24 @@ const CHARACTERS = [
 const CHAR_BY_ID = Object.fromEntries(CHARACTERS.map(c => [c.id, c]));
 function charOf(id) { return CHAR_BY_ID[id] || null; }
 
+function hashString(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+/* 캐릭터를 아직 고르지 않은 피클도 니케 SD 5인 중 하나로 보이게 합니다.
+   id(없으면 이름) 해시로 늘 같은 캐릭터가 배정되고, 본인이 모달에서 바꾸면 그 값이 우선합니다. */
+function charOrDefault(person) {
+  const picked = charOf(person && person.character);
+  if (picked) return picked;
+  const key = (person && (person.pid || person.name)) || "pickle";
+  return CHARACTERS[hashString(String(key)) % CHARACTERS.length];
+}
+
 /* ---------------- 🎨 room decoration ---------------- */
 
-const DECOR_DEFAULTS = { carColor: "#17493c", lightTone: "gold", bannerText: "PICKLE MOTORS" };
+const DECOR_DEFAULTS = { carColor: "#f4f6fb", lightTone: "gold", bannerText: "PICKLE MOTORS" };
 
 const DECOR_CAR_COLORS = [
   { hex: "#f4f6fb", label: "펄 화이트" },
@@ -150,7 +165,7 @@ function linkify(raw, names) {
 }
 
 function avatarHTML(person, cls = "") {
-  const ch = charOf(person && person.character);
+  const ch = person ? charOrDefault(person) : null;
   if (ch) {
     return `<img class="avatar-img ${cls}" src="${ch.img}" alt="" loading="lazy">`;
   }
@@ -526,12 +541,12 @@ async function initStage() {
     setTimeout(() => finish(img.naturalWidth > 0), 6000);
   });
   if (!ready) {
-    fail("오피스 맵 이미지를 불러오지 못해 2D 맵으로 보여드립니다.");
+    fail("쇼룸 맵 이미지를 불러오지 못해 2D 맵으로 보여드립니다.");
     return;
   }
 
   try {
-    const mod = await import("./claymap.js?v=20261127clay2");
+    const mod = await import("./claymap.js?v=20261127dealer1");
     STAGE.api = mod.createClayMap({
       root: stage,
       zones: ZONES,
@@ -554,7 +569,7 @@ async function initStage() {
   } catch (err) {
     console.warn("clay map unavailable", err);
     if (diag.errors.length < 30) diag.errors.push("map:" + String((err && err.message) || err));
-    fail("오피스 맵을 준비하지 못해 2D 맵으로 보여드립니다.");
+    fail("쇼룸 맵을 준비하지 못해 2D 맵으로 보여드립니다.");
   }
 }
 
@@ -562,7 +577,7 @@ function stagePeople() {
   return participantList()
     .filter(p => p && p.pid)
     .map(p => {
-      const ch = charOf(p.character);
+      const ch = charOrDefault(p);
       return {
         pid: p.pid,
         name: p.name || "이름 없음",
@@ -593,7 +608,7 @@ function updateDock() {
   me.hidden = false;
   const critter = $("dockCritter");
   if (critter) {
-    const ch = charOf(state.me.character);
+    const ch = charOrDefault(state.me);
     if (ch) {
       critter.innerHTML = `<img src="${ch.img}" alt="">`;
     } else {
@@ -975,7 +990,7 @@ function renderMentions() {
   const people = participantList().filter(p => p.name);
   if (!people.length) { host.innerHTML = `<span class="head-hint">입장한 피클이 없습니다</span>`; return; }
   host.innerHTML = people.map(p => {
-    const ch = charOf(p.character);
+    const ch = charOrDefault(p);
     const face = ch
       ? `<img src="${ch.img}" alt="">`
       : escapeHtml((p.consonant || "?").slice(0, 1));
@@ -1019,7 +1034,7 @@ function renderChat() {
   feed.innerHTML = state.messages.map(m => {
     const isMe = mePid && m.pid === mePid;
     return `<div class="msg${isMe ? " is-me" : ""}">
-      ${avatarHTML({ color: m.color, consonant: m.consonant, character: m.character }, "sm")}
+      ${avatarHTML({ color: m.color, consonant: m.consonant, character: m.character, name: m.name }, "sm")}
       <div class="msg-body">
         <div class="msg-top">
           <span class="msg-name">${escapeHtml(m.name || "익명")}</span>
@@ -1111,7 +1126,7 @@ function taskHTML(t) {
     <div class="tcard-meta">
       <span class="tassignee">
         ${(() => {
-          const ch = charOf(t.assigneeCharacter);
+          const ch = charOf(t.assigneeCharacter) || charOrDefault({ name: t.assignee });
           const face = ch ? `<img src="${ch.img}" alt="">` : escapeHtml((t.assigneeConsonant || "?").slice(0, 1));
           return `<span class="dot-av" style="background:${escapeHtml(t.assigneeColor || "#C9932F")}">${face}</span>`;
         })()}
@@ -1132,7 +1147,7 @@ function renderMe() {
   const av = $("meAvatar");
   const nm = $("meName");
   if (state.me) {
-    const ch = charOf(state.me.character);
+    const ch = charOrDefault(state.me);
     if (ch) {
       av.innerHTML = `<img src="${ch.img}" alt="">`;
       av.style.background = "#F6E8D6";

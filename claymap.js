@@ -1,5 +1,5 @@
 /* ============================================================
-   claymap.js — 따뜻한 클레이 오피스 맵 위에 캐릭터를 세웁니다.
+   claymap.js — 클레이 자동차 전시장 맵 위에 캐릭터를 세웁니다.
    정적 배경(assets/showroom-map.png) + DOM 오버레이.
    app.js 의 Firebase 연동과는 느슨하게 연결됩니다:
    createClayMap({ root, zones, motion, onPersonClick })
@@ -8,15 +8,12 @@
 
 /* 배경 이미지 안에서 각 구역이 있는 자리 (퍼센트) */
 const PLACE = {
-  showroom: { x: 55, y: 63, tag: { x: 38, y: 31 } },
-  desk:     { x: 22, y: 71, tag: { x: 23, y: 47 } },
-  lounge:   { x: 69, y: 79, tag: { x: 81, y: 57 } }
+  showroom: { x: 41, y: 84, tag: { x: 56, y: 73 } },
+  desk:     { x: 21, y: 77, tag: { x: 15, y: 47 } },
+  lounge:   { x: 69, y: 79, tag: { x: 84, y: 44 } }
 };
 
-const DEFAULT_PLACE = { x: 50, y: 82, tag: { x: 50, y: 50 } };
-
-/* 배경 이미지에서 전시 차량이 있는 자리 (퍼센트) — 꾸미기에서 차 색을 입힙니다 */
-const CAR_RECT = { left: 49.28, top: 34.08, width: 7.10, height: 5.86 };
+const DEFAULT_PLACE = { x: 50, y: 83, tag: { x: 50, y: 50 } };
 
 const DECOR_PROP_IDS = ["tree", "gifts", "carpet", "plants", "welcomeStand", "spotlights"];
 const BANNER_DEFAULT = "PICKLE MOTORS";
@@ -230,7 +227,7 @@ export function createClayMap(opts = {}) {
       counts.set(zone.id, members.length);
       layer.innerHTML = members.map((p, i) => figureHTML(p, i)).join("");
       layer.classList.toggle("is-crowd", members.length > 3);
-      layer.classList.toggle("is-sparse", members.length > 0 && members.length <= 2);
+      layer.classList.toggle("is-sparse", members.length === 1);
     });
 
     people.forEach((p) => personIndex.set(String(p.pid), p));
@@ -289,7 +286,7 @@ export function createClayMap(opts = {}) {
       carShade.style.setProperty("--car", d.carColor);
       const n = parseInt(d.carColor.slice(1), 16);
       const lum = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
-      carShade.style.setProperty("--car-ink", lum < 0.34 ? "0.6" : lum < 0.6 ? "0.34" : "0.16");
+      carShade.style.setProperty("--car-ink", lum < 0.34 ? "0.30" : lum < 0.6 ? "0.16" : "0.07");
     }
 
     if (typeof d.bannerText === "string") {
