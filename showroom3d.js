@@ -33,12 +33,19 @@ const ZONE_FLAGS = {
   desk: { icon: "🤝", name: "상담 테이블" },
   lounge: { icon: "☕", name: "고객 라운지" }
 };
+/* where characters look: roughly toward the visitor, so their faces show */
+const FACE_TARGET = {
+  showroom: new THREE.Vector3(0, 0, 14),
+  desk: new THREE.Vector3(5.0, 0, 7.6),
+  lounge: new THREE.Vector3(-5.0, 0, 8.0)
+};
+const CHAR_SCALE = 1.14;
 
 const CAMERAS = {
-  overview: { pos: [0.6, 7.4, 14.6], target: [0, 1.5, 0.4] },
-  showroom: { pos: [3.1, 3.1, 8.4], target: [0, 1.15, 0.9] },
-  desk: { pos: [9.2, 3.4, 7.2], target: [5.7, 1.0, 1.2] },
-  lounge: { pos: [-2.2, 3.2, 7.4], target: [-5.9, 1.0, 1.1] }
+  overview: { pos: [0.4, 6.9, 13.9], target: [0, 1.35, 0.5] },
+  showroom: { pos: [3.6, 3.5, 9.9], target: [0, 1.15, 1.0] },
+  desk: { pos: [10.4, 3.6, 7.8], target: [5.7, 1.05, 1.2] },
+  lounge: { pos: [-1.4, 3.3, 7.8], target: [-5.9, 1.05, 1.2] }
 };
 
 /* ---------------- tiny helpers ---------------- */
@@ -110,14 +117,14 @@ function marbleTexture() {
 function nightTexture() {
   return canvasTex(1024, 640, (x, w, h) => {
     const g = x.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, "#050a16");
-    g.addColorStop(0.55, "#0a1526");
-    g.addColorStop(1, "#132238");
+    g.addColorStop(0, "#0a1526");
+    g.addColorStop(0.5, "#122236");
+    g.addColorStop(1, "#1d3450");
     x.fillStyle = g;
     x.fillRect(0, 0, w, h);
-    const moon = x.createRadialGradient(w * 0.24, h * 0.24, 0, w * 0.24, h * 0.24, 150);
-    moon.addColorStop(0, "rgba(220,235,255,.55)");
-    moon.addColorStop(0.2, "rgba(180,210,255,.16)");
+    const moon = x.createRadialGradient(w * 0.24, h * 0.24, 0, w * 0.24, h * 0.24, 170);
+    moon.addColorStop(0, "rgba(226,240,255,.75)");
+    moon.addColorStop(0.2, "rgba(180,210,255,.2)");
     moon.addColorStop(1, "rgba(160,200,255,0)");
     x.fillStyle = moon;
     x.fillRect(0, 0, w, h);
@@ -188,7 +195,7 @@ export function createShowroom(opts = {}) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.02;
+  renderer.toneMappingExposure = 1.12;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x04060a);
@@ -228,8 +235,8 @@ export function createShowroom(opts = {}) {
     console.warn("env map skipped", e);
   }
 
-  scene.add(new THREE.HemisphereLight(0x33405c, 0x05070b, 0.55));
-  scene.add(new THREE.AmbientLight(0x2a3244, 0.35));
+  scene.add(new THREE.HemisphereLight(0x3a4a68, 0x05070b, 0.72));
+  scene.add(new THREE.AmbientLight(0x2c3648, 0.45));
 
   /* ---------- shared materials ---------- */
 
@@ -342,12 +349,7 @@ export function createShowroom(opts = {}) {
     world.add(rail);
   });
 
-  /* ---------- ceiling fittings & beams ---------- */
-
-  const beamMat = new THREE.MeshBasicMaterial({
-    color: 0xffd9a0, transparent: true, opacity: 0.032, depthWrite: false,
-    side: THREE.DoubleSide, blending: THREE.AdditiveBlending
-  });
+  /* ---------- ceiling fittings ---------- */
 
   function ceilingSpot(x, z, y, color, intensity, radius, height, withShadow) {
     const g = new THREE.Group();
@@ -362,11 +364,14 @@ export function createShowroom(opts = {}) {
     bulb.rotation.x = Math.PI / 2;
     bulb.position.y = y - 0.15;
     g.add(bulb);
-    const beam = new THREE.Mesh(new THREE.ConeGeometry(radius, height, 26, 1, true), beamMat.clone());
-    beam.material.color = new THREE.Color(color);
-    beam.position.y = y - height / 2 - 0.2;
-    g.add(beam);
-    const light = new THREE.SpotLight(color, intensity, height + 9, Math.min(0.95, radius / height * 1.5), 0.55, 1.2);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: GLOW_TEX, color, transparent: true, opacity: 0.32,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    }));
+    halo.scale.set(1.5, 1.5, 1);
+    halo.position.y = y - 0.16;
+    g.add(halo);
+    const light = new THREE.SpotLight(color, intensity, height + 9, Math.min(0.95, (radius / height) * 1.5), 0.6, 1.2);
     light.position.set(0, y - 0.2, 0);
     light.target.position.set(0, 0, 0.6);
     g.add(light);
@@ -379,13 +384,24 @@ export function createShowroom(opts = {}) {
       light.shadow.bias = -0.0012;
       light.shadow.radius = 3;
     }
+    // soft pool of light on the floor
+    const pool = new THREE.Mesh(
+      new THREE.CircleGeometry(radius * 1.15, 48),
+      new THREE.MeshBasicMaterial({
+        map: GLOW_TEX, color, transparent: true, opacity: 0.12,
+        depthWrite: false, blending: THREE.AdditiveBlending
+      })
+    );
+    pool.rotation.x = -Math.PI / 2;
+    pool.position.set(0, 0.016, 0.4);
+    g.add(pool);
     world.add(g);
     return g;
   }
 
-  ceilingSpot(0, 0.7, 4.7, 0xfff0d4, 150, 3.4, 4.7, true);
-  ceilingSpot(5.9, 1.2, 4.3, 0xffd6a2, 70, 2.4, 4.3, false);
-  ceilingSpot(-5.9, 1.4, 4.3, 0xffcfa0, 60, 2.4, 4.3, false);
+  ceilingSpot(0, 0.7, 4.7, 0xfff0d4, 165, 3.4, 4.7, true);
+  ceilingSpot(5.9, 1.2, 4.3, 0xffd6a2, 44, 2.4, 4.3, false);
+  ceilingSpot(-5.9, 1.4, 4.3, 0xffcfa0, 38, 2.4, 4.3, false);
 
   /* ---------- main showroom: turntable + car ---------- */
 
@@ -428,12 +444,12 @@ export function createShowroom(opts = {}) {
   function buildCar() {
     const g = new THREE.Group();
     const paint = new THREE.MeshPhysicalMaterial({
-      color: 0x123b31, metalness: 0.95, roughness: 0.21,
-      clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 1.7
+      color: 0x17493c, metalness: 0.9, roughness: 0.19,
+      clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.9
     });
     const glass = new THREE.MeshPhysicalMaterial({
-      color: 0x0a1622, metalness: 0.35, roughness: 0.04, transparent: true,
-      opacity: 0.86, envMapIntensity: 2.4
+      color: 0x1b3a52, metalness: 0.5, roughness: 0.03, transparent: true,
+      opacity: 0.92, envMapIntensity: 2.8
     });
     const trim = new THREE.MeshStandardMaterial({ color: 0x0c0f14, metalness: 0.6, roughness: 0.5 });
 
@@ -489,30 +505,42 @@ export function createShowroom(opts = {}) {
     g.add(shoulderR);
 
     // wheels
-    const tireGeo = new THREE.CylinderGeometry(0.44, 0.44, 0.31, 28);
-    const rimGeo = new THREE.CylinderGeometry(0.27, 0.27, 0.32, 24);
-    const tireMat = new THREE.MeshStandardMaterial({ color: 0x090a0d, roughness: 0.94, metalness: 0.06 });
-    const rimMat = new THREE.MeshStandardMaterial({ color: 0xd6dde8, metalness: 0.98, roughness: 0.2 });
-    const spokeGeo = new THREE.BoxGeometry(0.42, 0.055, 0.055);
+    const tireGeo = new THREE.CylinderGeometry(0.455, 0.455, 0.34, 30);
+    const rimGeo = new THREE.CylinderGeometry(0.245, 0.245, 0.30, 26);
+    const rimLipGeo = new THREE.TorusGeometry(0.255, 0.032, 8, 28);
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x08090c, roughness: 0.96, metalness: 0.04 });
+    const rimMat = new THREE.MeshStandardMaterial({ color: 0x8c95a3, metalness: 0.95, roughness: 0.32 });
+    const discMat = new THREE.MeshStandardMaterial({ color: 0x1a1e26, metalness: 0.7, roughness: 0.45 });
+    const spokeGeo = new THREE.BoxGeometry(0.4, 0.062, 0.05);
     const caliperMat = new THREE.MeshStandardMaterial({ color: 0xe0a850, metalness: 0.7, roughness: 0.35, emissive: 0x2a1a04 });
-    [[1.42, 0.99], [1.42, -0.99], [-1.42, 0.99], [-1.42, -0.99]].forEach(([x, z]) => {
+    [[1.42, 0.92], [1.42, -0.92], [-1.42, 0.92], [-1.42, -0.92]].forEach(([x, z]) => {
       const w = new THREE.Group();
-      w.position.set(x, 0.44, z);
+      w.position.set(x, 0.455, z);
+      const side = z > 0 ? 1 : -1;
       const tire = new THREE.Mesh(tireGeo, tireMat);
       tire.rotation.x = Math.PI / 2;
       tire.castShadow = true;
       w.add(tire);
-      const rim = new THREE.Mesh(rimGeo, rimMat);
-      rim.rotation.x = Math.PI / 2;
-      w.add(rim);
+      const disc = new THREE.Mesh(rimGeo, discMat);
+      disc.rotation.x = Math.PI / 2;
+      disc.position.z = side * 0.012;
+      w.add(disc);
+      const lip = new THREE.Mesh(rimLipGeo, rimMat);
+      lip.rotation.x = Math.PI / 2;
+      lip.position.z = side * 0.09;
+      w.add(lip);
       for (let i = 0; i < 5; i++) {
         const spoke = new THREE.Mesh(spokeGeo, rimMat);
         spoke.rotation.z = (i / 5) * TAU;
-        spoke.position.z = z > 0 ? 0.055 : -0.055;
+        spoke.position.z = side * 0.1;
         w.add(spoke);
       }
-      const caliper = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.19, 0.07), caliperMat);
-      caliper.position.set(-0.02, 0.22, z > 0 ? 0.1 : -0.1);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.04, 14), rimMat);
+      hub.rotation.x = Math.PI / 2;
+      hub.position.z = side * 0.11;
+      w.add(hub);
+      const caliper = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.19, 0.06), caliperMat);
+      caliper.position.set(-0.02, 0.2, side * 0.055);
       w.add(caliper);
       g.add(w);
     });
@@ -1292,7 +1320,7 @@ export function createShowroom(opts = {}) {
   function labelHTML(person) {
     const wrap = document.createElement("div");
     wrap.className = "c3d-label";
-    wrap.innerHTML = '<div class="c3d-top"><span class="c3d-dot"></span><span class="c3d-name"></span></div><span class="c3d-status"></span><span class="c3d-msg"></span>';
+    wrap.innerHTML = '<div class="c3d-top"><span class="c3d-dot"></span><span class="c3d-name"></span><span class="c3d-status"></span></div>';
     updateLabel(wrap, person);
     return wrap;
   }
@@ -1307,9 +1335,6 @@ export function createShowroom(opts = {}) {
     st.style.color = accent;
     st.style.borderColor = accent + "55";
     st.style.background = accent + "1f";
-    const msg = el.querySelector(".c3d-msg");
-    msg.textContent = person.message || "";
-    msg.hidden = !person.message;
   }
 
   function createPerson(p) {
@@ -1355,8 +1380,9 @@ export function createShowroom(opts = {}) {
     const el = labelHTML(p);
     const label = new CSS2DObject(el);
     label.center.set(0.5, 1);
-    label.position.set(0, H + 0.55, 0);
+    label.position.set(0, H * CHAR_SCALE + 0.16, 0);
     group.add(label);
+    group.scale.setScalar(CHAR_SCALE);
 
     const anchor = new THREE.Vector3(group.position.x, 0, group.position.z);
     const rec = {
@@ -1391,8 +1417,8 @@ export function createShowroom(opts = {}) {
     const [x, z] = slotFor(zone, index);
     rec.targetZone = zone;
     rec.anchorTarget = new THREE.Vector3(x, 0, z);
-    const focal = ZONE_FOCALS[zone] || ZONE_FOCALS.showroom;
-    rec.targetYaw = Math.atan2(focal.x - x, focal.z - z);
+    const face = FACE_TARGET[zone] || FACE_TARGET.showroom;
+    rec.targetYaw = Math.atan2(face.x - x, face.z - z);
   }
 
   function removePerson(rec) {
@@ -1529,7 +1555,8 @@ export function createShowroom(opts = {}) {
       const bob = reduced ? 0 : Math.sin(elapsed * 1.7 + rec.phase) * 0.035;
       const breathe = reduced ? 1 : 1 + Math.sin(elapsed * 1.45 + rec.phase) * 0.018;
       rec.group.position.set(rec.anchor.x, bob, rec.anchor.z);
-      rec.group.scale.set(1 / Math.sqrt(breathe), breathe, 1 / Math.sqrt(breathe));
+      const side = CHAR_SCALE / Math.sqrt(breathe);
+      rec.group.scale.set(side, CHAR_SCALE * breathe, side);
       let dy = rec.targetYaw - rec.yaw;
       while (dy > Math.PI) dy -= TAU;
       while (dy < -Math.PI) dy += TAU;
