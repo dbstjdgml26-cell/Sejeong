@@ -1501,10 +1501,14 @@ export function createShowroom(opts = {}) {
   }
 
   function focusZone(name) {
-    const preset = CAMERAS[name] || CAMERAS.overview;
+    const narrow = (container.clientWidth || 1000) < 520;
+    const base = CAMERAS[name] || CAMERAS.overview;
+    const preset = narrow && name === "overview"
+      ? { pos: [0.4, 5.2, 10.6], target: [0, 1.3, 1.0] }
+      : base;
     const target = new THREE.Vector3(...preset.target);
     const desired = new THREE.Vector3(...preset.pos);
-    const f = name === "overview" ? fitFactor() : Math.min(fitFactor(), 1.25);
+    const f = narrow ? 1 : (name === "overview" ? fitFactor() : Math.min(fitFactor(), 1.25));
     desired.sub(target).multiplyScalar(f).add(target);
     camTween = {
       t: 0, dur: 0.95,

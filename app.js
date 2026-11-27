@@ -475,7 +475,7 @@ async function initStage() {
     return;
   }
   try {
-    const mod = await import("./showroom3d.js?v=20261127i");
+    const mod = await import("./showroom3d.js?v=20261127j");
     STAGE.api = mod.createShowroom({
       canvas: $("scene3d"),
       container: stage,

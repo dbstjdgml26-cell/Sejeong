@@ -728,3 +728,12 @@ body{
 .cam-btn:focus{outline:none}
 .cam-btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .zone-flag{color:rgba(238,216,180,.86)}
+
+/* narrower screens: smaller fixed-size 3D labels so they don't pile up */
+@media (max-width:560px){
+  .c3d-top{padding:3px 7px 3px 8px;gap:4px}
+  .c3d-name{font-size:9.5px}
+  .c3d-status{font-size:8px;padding:0 4px}
+  .zone-flag{font-size:8.5px;padding:2px 7px;letter-spacing:.1em}
+  .zone-flag-icon{font-size:9px}
+}
