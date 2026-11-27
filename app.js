@@ -256,7 +256,6 @@ async function fbStart() {
   api.onValue(api.ref(db, "office/decor"), (snap) => {
     const prev = state.decor;
     const next = normalizeDecor(snap.val());
-    decorSynced = true;
     state.decor = next;
     applyDecorToStage(next);
     renderDecorUI();
@@ -526,7 +525,7 @@ async function initStage() {
     return;
   }
   try {
-    const mod = await import("./showroom3d.js?v=20261127d");
+    const mod = await import("./showroom3d.js?v=20261127e");
     STAGE.api = mod.createShowroom({
       canvas: $("scene3d"),
       container: stage,
@@ -630,7 +629,6 @@ function syncStage() {
 
 /* ---------------- 🎨 shared room decoration ---------------- */
 
-let decorSynced = false;
 let decorSaveTimer = null;
 
 function normalizeDecor(raw) {
