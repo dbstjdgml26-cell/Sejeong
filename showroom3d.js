@@ -87,7 +87,7 @@ function marbleTexture() {
     for (let i = 0; i < 60; i++) {
       const cx = Math.random() * w, cy = Math.random() * w, r = rand(60, 260);
       const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
-      g.addColorStop(0, `rgba(150,170,200,${rand(0.015, 0.05)})`);
+      g.addColorStop(0, `rgba(150,170,200,${rand(0.006, 0.018)})`);
       g.addColorStop(1, "rgba(150,170,200,0)");
       x.fillStyle = g;
       x.fillRect(cx - r, cy - r, r * 2, r * 2);
@@ -255,6 +255,7 @@ export function createShowroom(opts = {}) {
     gold: new THREE.MeshStandardMaterial({ color: 0xe6c48a, metalness: 0.95, roughness: 0.26 }),
     goldGlow: new THREE.MeshStandardMaterial({ color: 0xffd9a0, emissive: 0xffb95c, emissiveIntensity: 2.4, roughness: 0.4 }),
     cream: new THREE.MeshStandardMaterial({ color: 0xece3d3, metalness: 0.05, roughness: 0.62 }),
+    stone: new THREE.MeshStandardMaterial({ color: 0x2a303b, metalness: 0.35, roughness: 0.34 }),
     fabric: new THREE.MeshStandardMaterial({ color: 0x2a3040, metalness: 0.05, roughness: 0.95 }),
     fabricWarm: new THREE.MeshStandardMaterial({ color: 0x3b3038, metalness: 0.05, roughness: 0.95 }),
     wood: new THREE.MeshStandardMaterial({ color: 0x3a2a22, metalness: 0.1, roughness: 0.68 }),
@@ -505,11 +506,11 @@ export function createShowroom(opts = {}) {
     g.add(shoulderR);
 
     // wheels
-    const tireGeo = new THREE.CylinderGeometry(0.455, 0.455, 0.34, 30);
+    const tireGeo = new THREE.CylinderGeometry(0.455, 0.455, 0.30, 30);
     const rimGeo = new THREE.CylinderGeometry(0.245, 0.245, 0.30, 26);
     const rimLipGeo = new THREE.TorusGeometry(0.255, 0.032, 8, 28);
     const tireMat = new THREE.MeshStandardMaterial({ color: 0x08090c, roughness: 0.96, metalness: 0.04 });
-    const rimMat = new THREE.MeshStandardMaterial({ color: 0x8c95a3, metalness: 0.95, roughness: 0.32 });
+    const rimMat = new THREE.MeshStandardMaterial({ color: 0xc2cad6, metalness: 0.95, roughness: 0.28 });
     const discMat = new THREE.MeshStandardMaterial({ color: 0x1a1e26, metalness: 0.7, roughness: 0.45 });
     const spokeGeo = new THREE.BoxGeometry(0.4, 0.062, 0.05);
     const caliperMat = new THREE.MeshStandardMaterial({ color: 0xe0a850, metalness: 0.7, roughness: 0.35, emissive: 0x2a1a04 });
@@ -523,21 +524,21 @@ export function createShowroom(opts = {}) {
       w.add(tire);
       const disc = new THREE.Mesh(rimGeo, discMat);
       disc.rotation.x = Math.PI / 2;
-      disc.position.z = side * 0.012;
+      disc.position.z = side * 0.03;
       w.add(disc);
       const lip = new THREE.Mesh(rimLipGeo, rimMat);
       lip.rotation.x = Math.PI / 2;
-      lip.position.z = side * 0.09;
+      lip.position.z = side * 0.125;
       w.add(lip);
       for (let i = 0; i < 5; i++) {
         const spoke = new THREE.Mesh(spokeGeo, rimMat);
         spoke.rotation.z = (i / 5) * TAU;
-        spoke.position.z = side * 0.1;
+        spoke.position.z = side * 0.13;
         w.add(spoke);
       }
       const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.04, 14), rimMat);
       hub.rotation.x = Math.PI / 2;
-      hub.position.z = side * 0.11;
+      hub.position.z = side * 0.145;
       w.add(hub);
       const caliper = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.19, 0.06), caliperMat);
       caliper.position.set(-0.02, 0.2, side * 0.055);
@@ -811,7 +812,7 @@ export function createShowroom(opts = {}) {
   barBody.position.y = 0.51;
   barBody.castShadow = true;
   bar.add(barBody);
-  const barTop = new THREE.Mesh(new RoundedBoxGeometry(0.78, 0.07, 3.24, 3, 0.03), MAT.cream);
+  const barTop = new THREE.Mesh(new RoundedBoxGeometry(0.78, 0.07, 3.24, 3, 0.03), MAT.stone);
   barTop.position.y = 1.06;
   bar.add(barTop);
   const barShelf = new THREE.Mesh(new RoundedBoxGeometry(0.3, 0.06, 3.0, 2, 0.02), MAT.wood);
