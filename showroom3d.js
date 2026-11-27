@@ -42,7 +42,7 @@ const FACE_TARGET = {
 const CHAR_SCALE = 1.14;
 
 const CAMERAS = {
-  overview: { pos: [0.4, 6.9, 13.9], target: [0, 1.35, 0.5] },
+  overview: { pos: [0.3, 6.1, 12.6], target: [0, 1.4, 1.1] },
   showroom: { pos: [3.6, 3.5, 9.9], target: [0, 1.15, 1.0] },
   desk: { pos: [10.4, 3.6, 7.8], target: [5.7, 1.05, 1.2] },
   lounge: { pos: [-1.4, 3.3, 7.8], target: [-5.9, 1.05, 1.2] }
@@ -242,8 +242,8 @@ export function createShowroom(opts = {}) {
 
   const MAT = {
     marble: new THREE.MeshPhysicalMaterial({
-      map: marbleTexture(), metalness: 0.62, roughness: 0.24,
-      clearcoat: 0.55, clearcoatRoughness: 0.22, envMapIntensity: 1.0
+      map: marbleTexture(), metalness: 0.42, roughness: 0.36,
+      clearcoat: 0.45, clearcoatRoughness: 0.3, envMapIntensity: 0.28
     }),
     darkMetal: new THREE.MeshStandardMaterial({ color: 0x14181f, metalness: 0.88, roughness: 0.34 }),
     charcoal: new THREE.MeshStandardMaterial({ color: 0x101419, metalness: 0.25, roughness: 0.72 }),
@@ -280,7 +280,7 @@ export function createShowroom(opts = {}) {
   // glossy inlay disc under the main showroom
   const inlay = new THREE.Mesh(
     new THREE.CircleGeometry(7.2, 72),
-    new THREE.MeshPhysicalMaterial({ color: 0x090c12, metalness: 0.85, roughness: 0.1, envMapIntensity: 1.35 })
+    new THREE.MeshPhysicalMaterial({ color: 0x090c12, metalness: 0.7, roughness: 0.22, envMapIntensity: 0.45 })
   );
   inlay.rotation.x = -Math.PI / 2;
   inlay.position.set(0, 0.004, 0.4);
@@ -1351,14 +1351,15 @@ export function createShowroom(opts = {}) {
     body.castShadow = true;
     group.add(body);
 
-    const eyeMat = new THREE.MeshStandardMaterial({ color: 0x121019, roughness: 0.28, metalness: 0.05 });
+    const eyeMat = new THREE.MeshStandardMaterial({ color: 0x121019, roughness: 0.24, metalness: 0.05 });
     const shineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    [-0.115, 0.115].forEach((dx) => {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 12), eyeMat);
+    [-0.125, 0.125].forEach((dx) => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.098, 18, 14), eyeMat);
+      eye.scale.y = 1.12;
       eye.position.set(dx, H * 0.7, R * 0.7);
       group.add(eye);
-      const shine = new THREE.Mesh(new THREE.SphereGeometry(0.024, 8, 6), shineMat);
-      shine.position.set(dx + 0.022, H * 0.7 + 0.028, R * 0.7 + 0.062);
+      const shine = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 6), shineMat);
+      shine.position.set(dx + 0.028, H * 0.7 + 0.034, R * 0.7 + 0.07);
       group.add(shine);
     });
 
