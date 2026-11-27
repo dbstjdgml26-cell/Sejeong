@@ -44,8 +44,8 @@ const CHAR_SCALE = 1.14;
 const CAMERAS = {
   overview: { pos: [0.3, 6.1, 12.6], target: [0, 1.4, 1.1] },
   showroom: { pos: [3.6, 3.5, 9.9], target: [0, 1.15, 1.0] },
-  desk: { pos: [8.0, 3.3, 8.2], target: [5.6, 1.0, 1.1] },
-  lounge: { pos: [-1.4, 3.3, 7.8], target: [-5.9, 1.05, 1.2] }
+  desk: { pos: [6.9, 3.15, 7.0], target: [5.85, 0.95, 1.15] },
+  lounge: { pos: [-3.3, 3.1, 6.8], target: [-5.85, 0.95, 1.3] }
 };
 
 /* ---------------- tiny helpers ---------------- */
@@ -247,7 +247,7 @@ export function createShowroom(opts = {}) {
     }),
     darkMetal: new THREE.MeshStandardMaterial({ color: 0x14181f, metalness: 0.88, roughness: 0.34 }),
     charcoal: new THREE.MeshStandardMaterial({ color: 0x101419, metalness: 0.25, roughness: 0.72 }),
-    wall: new THREE.MeshStandardMaterial({ color: 0x0a0e15, metalness: 0.15, roughness: 0.88 }),
+    wall: new THREE.MeshStandardMaterial({ color: 0x0f141c, metalness: 0.15, roughness: 0.92 }),
     glass: new THREE.MeshPhysicalMaterial({
       color: 0x8fc4ff, metalness: 0, roughness: 0.05, transparent: true, opacity: 0.16,
       envMapIntensity: 1.4, side: THREE.DoubleSide
