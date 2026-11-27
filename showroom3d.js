@@ -1504,7 +1504,7 @@ export function createShowroom(opts = {}) {
     const narrow = (container.clientWidth || 1000) < 520;
     const base = CAMERAS[name] || CAMERAS.overview;
     const preset = narrow && name === "overview"
-      ? { pos: [0.4, 5.2, 10.6], target: [0, 1.3, 1.0] }
+      ? { pos: [0.4, 6.4, 13.6], target: [0, 1.45, 0.85] }
       : base;
     const target = new THREE.Vector3(...preset.target);
     const desired = new THREE.Vector3(...preset.pos);
@@ -1555,7 +1555,7 @@ export function createShowroom(opts = {}) {
     const h = container.clientHeight || 420;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    camera.fov = w < 520 ? 60 : w < 760 ? 54 : 48;
+    camera.fov = w < 520 ? 62 : w < 760 ? 54 : 48;
     camera.updateProjectionMatrix();
     labelRenderer.setSize(w, h);
   }

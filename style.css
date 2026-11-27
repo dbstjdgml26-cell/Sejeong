@@ -705,8 +705,9 @@ body{
   .panel-head h2{font-size:13.5px}
   .season-bar{margin-left:0;width:100%;justify-content:flex-start}
   .stage{height:clamp(320px,50vh,440px);border-radius:15px}
-  .stage-presets{top:8px;right:8px;gap:4px;left:8px;justify-content:flex-start}
-  .cam-btn{font-size:10.5px;padding:6px 9px}
+  .stage-presets{top:8px;right:8px;gap:4px;left:8px;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .stage-presets::-webkit-scrollbar{display:none}
+  .cam-btn{font-size:10.5px;padding:6px 9px;flex:none}
   .stage-chips{left:8px;bottom:8px;gap:4px}
   .zone-chip{font-size:9.5px;padding:4px 7px}
   .seat-dock{padding:9px 10px}
