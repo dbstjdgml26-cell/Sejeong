@@ -42,7 +42,7 @@ const FACE_TARGET = {
 const CHAR_SCALE = 1.14;
 
 const CAMERAS = {
-  overview: { pos: [0.3, 6.1, 12.6], target: [0, 1.4, 1.1] },
+  overview: { pos: [0.3, 6.8, 13.6], target: [0, 1.35, 0.95] },
   showroom: { pos: [3.6, 3.5, 9.9], target: [0, 1.15, 1.0] },
   desk: { pos: [6.9, 3.15, 7.0], target: [5.85, 0.95, 1.15] },
   lounge: { pos: [-3.3, 3.1, 6.8], target: [-5.85, 0.95, 1.3] }
@@ -709,14 +709,14 @@ export function createShowroom(opts = {}) {
   const plantPot = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.2, 0.42, 18), MAT.charcoal);
   plantPot.position.set(1.85, 0.21, -1.05);
   desk.add(plantPot);
-  for (let i = 0; i < 7; i++) {
-    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.85, 5), new THREE.MeshStandardMaterial({
-      color: 0x1f6b4d, roughness: 0.8, metalness: 0.05
-    }));
-    const a = (i / 7) * TAU;
-    leaf.position.set(1.85 + Math.cos(a) * 0.12, 0.72, -1.05 + Math.sin(a) * 0.12);
-    leaf.rotation.set(Math.cos(a) * 0.35, 0, Math.sin(a) * 0.35);
-    desk.add(leaf);
+  const plantLeafMat = new THREE.MeshStandardMaterial({ color: 0x2f7d58, roughness: 0.78, metalness: 0.04 });
+  for (let i = 0; i < 11; i++) {
+    const clump = new THREE.Mesh(new THREE.SphereGeometry(rand(0.1, 0.17), 10, 8), plantLeafMat);
+    const a = (i / 11) * TAU;
+    const rr = rand(0.02, 0.16);
+    clump.position.set(1.85 + Math.cos(a) * rr, 0.5 + rand(0, 0.22), -1.05 + Math.sin(a) * rr);
+    clump.scale.set(1, 0.78, 1);
+    desk.add(clump);
   }
 
   /* ---------- customer lounge ---------- */
