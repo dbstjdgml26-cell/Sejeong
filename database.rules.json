@@ -1,0 +1,29 @@
+{
+  "rules": {
+    "office": {
+      ".read": true,
+      ".write": true,
+      "presence": {
+        "$pid": {
+          ".validate": "newData.hasChildren(['name','zone','status']) || !newData.exists()",
+          "name": { ".validate": "newData.isString() && newData.val().length <= 24" },
+          "zone": { ".validate": "newData.isString() && newData.val().length <= 16" },
+          "status": { ".validate": "newData.isString() && newData.val().length <= 24" },
+          "message": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 140)" }
+        }
+      },
+      "messages": {
+        ".indexOn": ["createdAt"],
+        "$mid": {
+          ".validate": "newData.hasChildren(['name','text','createdAt'])",
+          "text": { ".validate": "newData.isString() && newData.val().length <= 600" }
+        }
+      },
+      "tasks": {
+        "$tid": {
+          "title": { ".validate": "newData.isString() && newData.val().length <= 200" }
+        }
+      }
+    }
+  }
+}

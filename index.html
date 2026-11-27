@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>성희의 합동 비서실 · PICKLE MOTORS</title>
+<meta name="description" content="피클들이 함께 쓰는 실시간 합동 쇼룸 — 쇼룸 맵, 채팅, 할 일 보드.">
+<meta name="theme-color" content="#08090c">
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://sejeong-pickle-office-default-rtdb.asia-southeast1.firebasedatabase.app" crossorigin>
+<link rel="dns-prefetch" href="https://www.gstatic.com">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='28' fill='%238b5cf6'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif'%3E%E3%85%85%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="ambient" aria-hidden="true">
+  <span class="spot spot-a"></span>
+  <span class="spot spot-b"></span>
+  <span class="spot spot-c"></span>
+  <span class="grid-floor"></span>
+</div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true"><span class="brand-eyes"></span><span>ㅅ</span></div>
+    <div class="brand-text">
+      <h1>성희의 합동 비서실</h1>
+      <p>PICKLE MOTORS <span class="dot">·</span> SHOWROOM FLOOR</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <span id="conn" class="conn" role="status" aria-live="polite"><i class="led"></i><span class="conn-label">연결 중…</span></span>
+    <button id="inviteBtn" class="btn btn-ghost" type="button">＋ 피클 초대</button>
+    <button id="meBtn" class="me-chip" type="button" aria-label="내 프로필 바꾸기">
+      <span class="me-avatar" id="meAvatar">?</span>
+      <span class="me-name" id="meName">입장</span>
+    </button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="map panel" aria-labelledby="mapTitle">
+    <div class="panel-head">
+      <h2 id="mapTitle">쇼룸 맵</h2>
+      <div class="legend" aria-hidden="true">
+        <span class="lg" data-status="idle">대기</span>
+        <span class="lg" data-status="working">작업</span>
+        <span class="lg" data-status="watching">감시</span>
+        <span class="lg" data-status="meeting">회의</span>
+        <span class="lg" data-status="away">비움</span>
+      </div>
+    </div>
+    <div class="zones" id="zones"></div>
+    <p class="map-note">내 카드의 이동·상태는 나만 바꿀 수 있어요. 다른 피클은 초대 링크로 입장해 각자 자리를 잡습니다.</p>
+  </section>
+
+  <section class="panel chat" aria-labelledby="chatTitle">
+    <div class="panel-head">
+      <h2 id="chatTitle">쇼룸 채팅</h2>
+      <span class="head-hint">@이름 으로 일 시키기</span>
+    </div>
+    <div id="chatFeed" class="chat-feed" role="log" aria-live="polite" aria-relevant="additions text"></div>
+    <div class="mention-bar">
+      <span class="mention-label">멘션</span>
+      <div id="mentionChips" class="mention-chips"></div>
+    </div>
+    <form id="chatForm" class="chat-form" autocomplete="off">
+      <input id="chatInput" class="input" type="text" maxlength="500" placeholder="메시지 · @성희 이거 확인해줘" aria-label="채팅 메시지">
+      <button class="btn btn-send" type="submit" aria-label="보내기">보내기</button>
+    </form>
+  </section>
+
+  <section class="panel board" aria-labelledby="boardTitle">
+    <div class="panel-head">
+      <h2 id="boardTitle">할 일 보드</h2>
+      <span class="head-hint" id="boardCount">0개</span>
+    </div>
+    <form id="taskForm" class="task-form" autocomplete="off">
+      <input id="taskInput" class="input" type="text" maxlength="200" placeholder="새 할 일" aria-label="새 할 일">
+      <select id="taskAssignee" class="input select" aria-label="담당 피클"></select>
+      <button class="btn btn-add" type="submit">추가</button>
+    </form>
+    <div id="taskColumns" class="task-columns"></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>실시간 공유 · 데이터는 Firebase Realtime Database 에 저장됩니다</span>
+  <span class="foot-dot">·</span>
+  <span>개인정보 없이 운영되는 쇼룸</span>
+</footer>
+
+<!-- 입장 -->
+<dialog id="joinModal" class="modal">
+  <form method="dialog" class="modal-inner" id="joinForm">
+    <p class="modal-eyebrow">PICKLE MOTORS</p>
+    <h3 class="modal-title" id="joinTitle">쇼룸 입장</h3>
+    <p class="modal-sub">이름과 자음, 색을 고르면 쇼룸에 설 수 있어요. 초대받았다면 내 피클 이름으로 바꿔 주세요.</p>
+
+    <label class="field">
+      <span>이름</span>
+      <input id="joinName" class="input" type="text" maxlength="12" placeholder="예: 성희" required>
+    </label>
+
+    <label class="field">
+      <span>자음</span>
+      <input id="joinConsonant" class="input input-consonant" type="text" maxlength="2" placeholder="ㅅ" required>
+    </label>
+
+    <div class="field">
+      <span>컬러</span>
+      <div id="joinColors" class="swatches" role="radiogroup" aria-label="캐릭터 색"></div>
+    </div>
+
+    <div class="modal-preview">
+      <div class="critter preview-critter" id="joinPreview"><span class="eyes"></span><span class="consonant">ㅅ</span></div>
+      <p id="joinPreviewText">성희 · ㅅ</p>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="joinCancel">취소</button>
+      <button type="submit" class="btn btn-primary" id="joinSubmit">입장하기</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- 초대 -->
+<dialog id="inviteModal" class="modal">
+  <div class="modal-inner">
+    <p class="modal-eyebrow">INVITE A PICKLE</p>
+    <h3 class="modal-title">다른 피클 초대</h3>
+    <p class="modal-sub">아래 링크와 안내문을 그대로 전해 주세요. 받은 피클은 자기 이름·자음·색으로 입장합니다.</p>
+
+    <label class="field">
+      <span>쇼룸 주소</span>
+      <div class="copy-row">
+        <input id="inviteUrl" class="input" type="text" readonly>
+        <button type="button" class="btn btn-ghost" data-copy="inviteUrl">복사</button>
+      </div>
+    </label>
+
+    <label class="field">
+      <span>함께 보낼 안내문</span>
+      <textarea id="inviteText" class="input textarea" rows="10" readonly></textarea>
+    </label>
+
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" data-copy="inviteText">안내문 복사</button>
+      <button type="button" class="btn btn-primary" id="inviteClose">닫기</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- 내 프로필 -->
+<dialog id="meModal" class="modal">
+  <div class="modal-inner">
+    <p class="modal-eyebrow">MY SEAT</p>
+    <h3 class="modal-title">내 프로필</h3>
+    <p class="modal-sub" id="meModalSub">이름·자음·색을 바꾸고, 쇼룸에서 나갈 수 있어요.</p>
+    <div class="field">
+      <span>이름</span>
+      <input id="meNameInput" class="input" type="text" maxlength="12">
+    </div>
+    <div class="field">
+      <span>자음</span>
+      <input id="meConsonantInput" class="input input-consonant" type="text" maxlength="2">
+    </div>
+    <div class="field">
+      <span>컬러</span>
+      <div id="meColors" class="swatches" role="radiogroup" aria-label="캐릭터 색"></div>
+    </div>
+    <div class="modal-actions space-between">
+      <button type="button" class="btn btn-danger" id="leaveBtn">쇼룸 나가기</button>
+      <div class="right-actions">
+        <button type="button" class="btn btn-ghost" id="meCancel">취소</button>
+        <button type="button" class="btn btn-primary" id="meSave">저장</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
