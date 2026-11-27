@@ -470,8 +470,12 @@ async function initStage() {
     fail("이 브라우저에서 WebGL을 쓸 수 없어 2D 맵으로 보여드립니다.");
     return;
   }
+  if (new URLSearchParams(location.search).get("stage") === "2d") {
+    fail("2D 맵으로 표시 중입니다 (저사양 모드).");
+    return;
+  }
   try {
-    const mod = await import("./showroom3d.js?v=20261127c");
+    const mod = await import("./showroom3d.js?v=20261127d");
     STAGE.api = mod.createShowroom({
       canvas: $("scene3d"),
       container: stage,

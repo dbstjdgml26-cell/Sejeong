@@ -894,7 +894,7 @@ export function createShowroom(opts = {}) {
     el.append(ico, nm);
     const obj = new CSS2DObject(el);
     const c = ZONE_CENTERS[id];
-    obj.position.set(c.x, id === "showroom" ? 3.0 : 2.7, c.z - (id === "desk" ? 2.2 : 2.6));
+    obj.position.set(c.x, id === "showroom" ? 3.7 : 3.2, c.z - (id === "lounge" ? 0.2 : 0.6));
     scene.add(obj);
     zoneLabels[id] = obj;
   });
@@ -1293,7 +1293,7 @@ export function createShowroom(opts = {}) {
   scene.add(personRoot);
 
   const SLOTS = {
-    showroom: [[-2.32, 4.32], [-1.16, 4.72], [0, 4.94], [1.16, 4.72], [2.32, 4.32], [3.3, 3.3], [-3.3, 3.3]],
+    showroom: [[-3.35, 4.15], [-1.68, 4.68], [0, 4.95], [1.68, 4.68], [3.35, 4.15], [4.2, 3.0], [-4.2, 3.0]],
     desk: (() => {
       const out = [];
       [30, 150, 270].forEach((d) => {
@@ -1382,13 +1382,13 @@ export function createShowroom(opts = {}) {
     const el = labelHTML(p);
     const label = new CSS2DObject(el);
     label.center.set(0.5, 1);
-    label.position.set(0, H * CHAR_SCALE + 0.16, 0);
+    label.position.set(0, H + 0.14, 0);
     group.add(label);
     group.scale.setScalar(CHAR_SCALE);
 
     const anchor = new THREE.Vector3(group.position.x, 0, group.position.z);
     const rec = {
-      pid: p.pid, group, body, label, el, ring, anchor,
+      pid: p.pid, group, body, label, el, ring, anchor, labelBaseY: H + 0.14,
       yaw: 0, targetYaw: 0, phase: Math.random() * TAU,
       person: { ...p }
     };
@@ -1419,6 +1419,7 @@ export function createShowroom(opts = {}) {
     const [x, z] = slotFor(zone, index);
     rec.targetZone = zone;
     rec.anchorTarget = new THREE.Vector3(x, 0, z);
+    rec.label.position.y = rec.labelBaseY + (index % 2) * 0.52;
     const face = FACE_TARGET[zone] || FACE_TARGET.showroom;
     rec.targetYaw = Math.atan2(face.x - x, face.z - z);
   }
