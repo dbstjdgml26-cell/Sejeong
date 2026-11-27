@@ -676,6 +676,7 @@ body{
   border:1px solid var(--line);
 }
 .dock-guest{display:flex;align-items:center;gap:10px;flex-wrap:wrap;width:100%}
+.dock-guest[hidden]{display:none}
 .dock-badge{
   flex:none;width:32px;height:32px;border-radius:11px;display:grid;place-items:center;
   font-size:14px;font-weight:800;color:#fff;
