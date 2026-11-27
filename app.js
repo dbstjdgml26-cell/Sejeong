@@ -48,6 +48,29 @@ const ME_KEY = "showroom.me.v1";
 const LOCAL_KEY = "showroom.local.v1";
 const MSG_LIMIT = 80;
 
+/* ---------------- seasonal theme ---------------- */
+
+const SEASON_META = {
+  christmas: { emoji: "🎄", label: "크리스마스 시즌" },
+  winter:    { emoji: "❄️", label: "겨울 시즌" },
+  spring:    { emoji: "🌸", label: "봄·벚꽃 시즌" },
+  summer:    { emoji: "🌴", label: "여름 시즌" },
+  autumn:    { emoji: "🍂", label: "가을 시즌" },
+  halloween: { emoji: "🎃", label: "할로윈 시즌" }
+};
+
+let seasonMode = "auto";
+const STAGE = { api: null, mode: "pending" };
+
+/* light diagnostics: last errors + which stage mode is running (no personal data) */
+const diag = (window.__pickleShowroom = { mode: "pending", season: null, sceneSeason: null, people: 0, errors: [] });
+window.addEventListener("error", (e) => {
+  if (diag.errors.length < 30) diag.errors.push(String((e && e.message) || e));
+});
+window.addEventListener("unhandledrejection", (e) => {
+  if (diag.errors.length < 30) diag.errors.push(String((e && e.reason && e.reason.message) || (e && e.reason) || e));
+});
+
 /* ---------------- utils ---------------- */
 
 const $ = (id) => document.getElementById(id);
@@ -386,6 +409,169 @@ function resolvePerson(name) {
   return { name: name || (state.me ? state.me.name : "성희"), consonant: "ㅅ", color: "#8b5cf6" };
 }
 
+/* ---------------- 3D stage ---------------- */
+
+function webglAvailable() {
+  try {
+    const c = document.createElement("canvas");
+    return !!(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl")));
+  } catch (e) { return false; }
+}
+
+function autoSeasonId(now = new Date()) {
+  const m = now.getMonth() + 1;
+  const d = now.getDate();
+  if ((m === 11 && d >= 20) || m === 12) return "christmas";
+  if (m === 1 || m === 2) return "winter";
+  if (m >= 3 && m <= 5) return "spring";
+  if (m >= 6 && m <= 8) return "summer";
+  return "autumn";
+}
+
+function isLateOctober(now = new Date()) {
+  return now.getMonth() === 9 && now.getDate() >= 20;
+}
+
+function applySeason(mode = seasonMode) {
+  seasonMode = mode || "auto";
+  const auto = seasonMode === "auto";
+  const id = auto ? autoSeasonId() : seasonMode;
+  const halloween = id === "autumn" && isLateOctober();
+  const meta = halloween ? SEASON_META.halloween : SEASON_META[id];
+  const badge = $("seasonBadge");
+  if (badge) badge.textContent = `${meta.emoji} ${meta.label} ${auto ? "자동 적용" : "미리보기"}`;
+  const map = document.querySelector(".map");
+  if (map) map.dataset.season = id;
+  const stage = $("stage3d");
+  if (stage) stage.dataset.season = id;
+  const sel = $("seasonSelect");
+  if (sel && sel.value !== seasonMode) sel.value = seasonMode;
+  diag.season = id + (halloween ? "+halloween" : "");
+  if (STAGE.api) {
+    diag.sceneSeason = STAGE.api.setSeason(id, { halloween });
+  }
+}
+
+async function initStage() {
+  const stage = $("stage3d");
+  const loading = $("stageLoading");
+  if (!stage) return;
+  const fail = (reason) => {
+    STAGE.mode = "2d";
+    diag.mode = "2d";
+    stage.classList.add("is-fallback");
+    const fb = $("stageFallback");
+    if (fb) fb.hidden = false;
+    const note = $("stageFallbackNote");
+    if (note && reason) note.textContent = reason;
+    if (loading) loading.hidden = true;
+  };
+  if (!webglAvailable()) {
+    fail("이 브라우저에서 WebGL을 쓸 수 없어 2D 맵으로 보여드립니다.");
+    return;
+  }
+  try {
+    const mod = await import("./showroom3d.js");
+    STAGE.api = mod.createShowroom({
+      canvas: $("scene3d"),
+      container: stage,
+      reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+      onPersonClick: (p) => {
+        const bits = [p.name, p.statusLabel];
+        if (p.message) bits.push(p.message);
+        toast(bits.filter(Boolean).join(" · "));
+      },
+      onFail: () => fail("3D 쇼룸을 시작하지 못해 2D 맵으로 보여드립니다.")
+    });
+    STAGE.mode = "3d";
+    diag.mode = "3d";
+    STAGE.api.focusZone("overview");
+    applySeason(seasonMode);
+    syncStage();
+    if (loading) {
+      loading.classList.add("is-done");
+      setTimeout(() => { loading.hidden = true; }, 420);
+    }
+  } catch (err) {
+    console.warn("3D showroom unavailable", err);
+    if (diag.errors.length < 30) diag.errors.push("3d:" + String((err && err.message) || err));
+    fail("3D 쇼룸을 불러오지 못해 2D 맵으로 보여드립니다.");
+  }
+}
+
+function stagePeople() {
+  return participantList()
+    .filter(p => p && p.pid)
+    .map(p => ({
+      pid: p.pid,
+      name: p.name || "이름 없음",
+      consonant: p.consonant || "",
+      color: p.color || "#8b5cf6",
+      zone: p.zone || "showroom",
+      status: p.status || "idle",
+      statusLabel: statusOf(p.status).label,
+      statusColor: statusOf(p.status).color,
+      message: p.message || "",
+      isMe: !!(state.me && p.pid === state.me.pid)
+    }));
+}
+
+function renderZoneChips(people) {
+  const host = $("stageZoneList");
+  if (!host) return;
+  host.innerHTML = ZONES.map(z => {
+    const n = people.filter(p => p.zone === z.id).length;
+    return `<button class="zone-chip" type="button" data-zone="${z.id}" aria-label="${z.name} 시점으로 보기, ${n}명">
+      <span aria-hidden="true">${z.icon}</span><span>${z.name}</span><span class="zc-count">${n}</span></button>`;
+  }).join("");
+  host.querySelectorAll(".zone-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      if (STAGE.api) STAGE.api.focusZone(chip.dataset.zone);
+      toast(`${zoneOf(chip.dataset.zone).name} 시점`);
+    });
+  });
+}
+
+function updateDock() {
+  const guest = $("dockGuest");
+  const me = $("dockMe");
+  if (!guest || !me) return;
+  if (!state.me) {
+    guest.hidden = false;
+    me.hidden = true;
+    return;
+  }
+  guest.hidden = true;
+  me.hidden = false;
+  const critter = $("dockCritter");
+  if (critter) {
+    critter.style.setProperty("--c", state.me.color || "#8b5cf6");
+    const cons = critter.querySelector(".consonant");
+    if (cons) cons.textContent = (state.me.consonant || "?").slice(0, 2);
+  }
+  const nm = $("dockName");
+  if (nm) nm.textContent = state.me.name;
+  const where = $("dockWhere");
+  if (where) where.textContent = `${zoneOf(state.me.zone).name} · ${statusOf(state.me.status).label}`;
+  document.querySelectorAll("#dockMe .zone-btn").forEach(b => {
+    b.setAttribute("aria-pressed", String(b.dataset.to === state.me.zone));
+  });
+  const st = $("dockStatus");
+  if (st && st.querySelector("option") && st.value !== state.me.status) st.value = state.me.status;
+  const msg = $("dockMsg");
+  if (msg && document.activeElement !== msg && msg.value !== (state.me.message || "")) {
+    msg.value = state.me.message || "";
+  }
+}
+
+function syncStage() {
+  const people = stagePeople();
+  diag.people = people.length;
+  renderZoneChips(people);
+  if (STAGE.api) STAGE.api.syncPeople(people);
+  updateDock();
+}
+
 /* ---------------- rendering ---------------- */
 
 function paintConn() {
@@ -410,7 +596,9 @@ function paintConn() {
 }
 
 function participantList() {
-  const list = Object.values(state.people).filter(Boolean).map(p => ({ ...p }));
+  const list = Object.entries(state.people || {})
+    .filter(([, p]) => p && typeof p === "object")
+    .map(([pid, p]) => ({ ...p, pid: p.pid || pid }));
   if (state.me) {
     const i = list.findIndex(p => p.pid === state.me.pid || p.name === state.me.name);
     const mine = { ...(i >= 0 ? list[i] : {}), ...state.me, pid: state.me.pid };
@@ -472,6 +660,8 @@ function renderZones() {
       if (state.pendingZoneRender) renderZones();
     });
   });
+
+  syncStage();
 }
 
 function seatHTML(p) {
@@ -876,6 +1066,61 @@ function wireEvents() {
   $("inviteUrl").addEventListener("focus", (e) => e.target.select());
   $("inviteText").addEventListener("focus", (e) => e.target.select());
 
+  /* ---- 3D stage controls ---- */
+  const seasonSel = $("seasonSelect");
+  if (seasonSel) {
+    seasonSel.addEventListener("change", () => applySeason(seasonSel.value));
+  }
+  const presets = $("cameraPresets");
+  if (presets) {
+    presets.querySelectorAll(".cam-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (STAGE.api) STAGE.api.focusZone(btn.dataset.cam);
+        presets.querySelectorAll(".cam-btn").forEach(b => b.classList.toggle("is-active", b === btn));
+      });
+    });
+  }
+  const dockJoin = $("dockJoin");
+  if (dockJoin) dockJoin.addEventListener("click", () => openJoin());
+
+  const dockStatus = $("dockStatus");
+  if (dockStatus) {
+    dockStatus.innerHTML = STATUSES.map(s => `<option value="${s.id}">${s.label}</option>`).join("");
+    dockStatus.addEventListener("change", () => {
+      if (!state.me) return;
+      state.me.status = dockStatus.value;
+      persistMe();
+      savePresence();
+      updateDock();
+      renderZones();
+    });
+  }
+  const dockMsg = $("dockMsg");
+  if (dockMsg) {
+    dockMsg.addEventListener("change", () => {
+      if (!state.me) return;
+      state.me.message = dockMsg.value.trim().slice(0, 140);
+      persistMe();
+      savePresence();
+      updateDock();
+    });
+    dockMsg.addEventListener("keydown", (e) => { if (e.key === "Enter") dockMsg.blur(); });
+  }
+  document.querySelectorAll("#dockMe .zone-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (!state.me) { openJoin(); toast("먼저 입장해 주세요"); return; }
+      state.me.zone = btn.dataset.to;
+      persistMe();
+      savePresence();
+      renderZones();
+      updateDock();
+    });
+  });
+
+  window.addEventListener("beforeunload", () => {
+    if (STAGE.api) { try { STAGE.api.dispose(); } catch (e) { /* ignore */ } }
+  });
+
   // Enter로 모달이 닫히지 않게 (dialog 기본 동작 방지)
   document.querySelectorAll("dialog").forEach(d => {
     d.addEventListener("keydown", (e) => {
@@ -895,6 +1140,8 @@ async function boot() {
   wireEvents();
   state.me = loadMe();
   renderAll();
+  applySeason("auto");
+  initStage();
 
   try {
     await connectFirebase();
