@@ -502,6 +502,11 @@ async function initStage() {
     diag.mode = "2d";
     const img = $("mapImg");
     if (img) img.hidden = true;
+    // 배경 지도가 없으면 꾸미기 레이어(배너·소품·차 색)도 함께 걷어냅니다
+    if (stage) {
+      const decor = stage.querySelector(".decor-layer");
+      if (decor) decor.hidden = true;
+    }
     const fb = $("stageFallback");
     if (fb) fb.hidden = false;
     const note = $("stageFallbackNote");
