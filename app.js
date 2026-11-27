@@ -38,6 +38,39 @@ const PALETTE = [
   "#e6c48a", "#f06fa8", "#38c7c7", "#9aa3b2"
 ];
 
+/* ---------------- 🎨 room decoration ---------------- */
+
+const DECOR_DEFAULTS = { carColor: "#17493c", lightTone: "gold", bannerText: "PICKLE MOTORS" };
+
+const DECOR_CAR_COLORS = [
+  { hex: "#f4f6fb", label: "펄 화이트" },
+  { hex: "#1a202c", label: "미드나잇 블랙" },
+  { hex: "#2563eb", label: "딥 블루" },
+  { hex: "#b91c1c", label: "카민 레드" },
+  { hex: "#94a3b8", label: "메탈릭 실버" },
+  { hex: "#0f766e", label: "포레스트 그린" },
+  { hex: "#17493c", label: "딥 그린" }
+];
+
+const DECOR_LIGHTS = [
+  { id: "gold", label: "골드", dot: "#ffc978" },
+  { id: "warm", label: "웜", dot: "#ff9a5c" },
+  { id: "cool", label: "쿨", dot: "#9fc8ff" },
+  { id: "emerald", label: "에메랄드", dot: "#46d69a" },
+  { id: "festive", label: "페스티브", dot: "#ff5b6a" }
+];
+
+const DECOR_PROPS = [
+  { id: "tree", icon: "🌲", label: "대형 트리" },
+  { id: "gifts", icon: "🎁", label: "선물 상자" },
+  { id: "carpet", icon: "🟥", label: "레드카펫" },
+  { id: "plants", icon: "🪴", label: "대형 화분" },
+  { id: "welcomeStand", icon: "🪧", label: "웰컴 스탠드" },
+  { id: "spotlights", icon: "💡", label: "스포트라이트" }
+];
+
+const DECOR_BANNER_PICKS = ["PICKLE MOTORS", "성희의 합동 비서실", "WELCOME", "PICKLE CLUB"];
+
 const TASK_COLUMNS = [
   { id: "todo",  title: "대기" },
   { id: "doing", title: "진행 중" },
@@ -165,6 +198,7 @@ const state = {
   people: {},           // pid -> presence
   messages: [],         // newest last
   tasks: [],
+  decor: null,          // shared showroom decoration (office/decor)
   mode: "connecting",   // connecting | live | local
   connected: false,
   firstSync: false,
@@ -218,6 +252,19 @@ async function fbStart() {
       .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     renderBoard();
   });
+
+  api.onValue(api.ref(db, "office/decor"), (snap) => {
+    const prev = state.decor;
+    const next = normalizeDecor(snap.val());
+    decorSynced = true;
+    state.decor = next;
+    applyDecorToStage(next);
+    renderDecorUI();
+    if (prev && next.updatedAt > prev.updatedAt && next.updatedBy &&
+        next.updatedBy !== prev.updatedBy) {
+      toast(`${next.updatedBy} 님이 공간을 꾸몄어요`);
+    }
+  }, onDbError);
 }
 
 function onDbError(err) {
@@ -283,11 +330,12 @@ function localLoad() {
     LOCAL.data = JSON.parse(localStorage.getItem(LOCAL_KEY) || "null");
   } catch (e) { LOCAL.data = null; }
   if (!LOCAL.data || typeof LOCAL.data !== "object") {
-    LOCAL.data = { presence: {}, messages: {}, tasks: {} };
+    LOCAL.data = { presence: {}, messages: {}, tasks: {}, decor: {} };
   }
   LOCAL.data.presence = LOCAL.data.presence || {};
   LOCAL.data.messages = LOCAL.data.messages || {};
   LOCAL.data.tasks = LOCAL.data.tasks || {};
+  LOCAL.data.decor = LOCAL.data.decor || {};
 }
 function localSave() {
   try { localStorage.setItem(LOCAL_KEY, JSON.stringify(LOCAL.data)); } catch (e) { /* quota */ }
@@ -302,6 +350,9 @@ function localApply() {
   state.tasks = Object.entries(LOCAL.data.tasks)
     .map(([id, t]) => ({ id, ...t }))
     .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  state.decor = normalizeDecor(LOCAL.data.decor);
+  applyDecorToStage(state.decor);
+  renderDecorUI();
   renderZones(); renderChat(); renderBoard(); renderMentions(); renderAssigneeOptions();
 }
 
@@ -475,7 +526,7 @@ async function initStage() {
     return;
   }
   try {
-    const mod = await import("./showroom3d.js?v=20261127p");
+    const mod = await import("./showroom3d.js?v=20261127d");
     STAGE.api = mod.createShowroom({
       canvas: $("scene3d"),
       container: stage,
@@ -491,6 +542,7 @@ async function initStage() {
     diag.mode = "3d";
     STAGE.api.focusZone("overview");
     applySeason(seasonMode);
+    applyDecorToStage(state.decor);
     syncStage();
     if (loading) {
       loading.classList.add("is-done");
@@ -574,6 +626,197 @@ function syncStage() {
   renderZoneChips(people);
   if (STAGE.api) STAGE.api.syncPeople(people);
   updateDock();
+}
+
+/* ---------------- 🎨 shared room decoration ---------------- */
+
+let decorSynced = false;
+let decorSaveTimer = null;
+
+function normalizeDecor(raw) {
+  const d = raw && typeof raw === "object" ? raw : {};
+  const rawProps = d.props && typeof d.props === "object" ? d.props : {};
+  const props = {};
+  DECOR_PROPS.forEach((p) => { props[p.id] = rawProps[p.id] === true; });
+  const carColor = typeof d.carColor === "string" && /^#[0-9a-fA-F]{6}$/.test(d.carColor)
+    ? d.carColor.toLowerCase()
+    : DECOR_DEFAULTS.carColor;
+  const lightTone = DECOR_LIGHTS.some((l) => l.id === d.lightTone) ? d.lightTone : DECOR_DEFAULTS.lightTone;
+  const bannerText = (typeof d.bannerText === "string" ? d.bannerText : "").trim().slice(0, 24) || DECOR_DEFAULTS.bannerText;
+  return {
+    carColor,
+    lightTone,
+    bannerText,
+    props,
+    updatedBy: typeof d.updatedBy === "string" ? d.updatedBy.slice(0, 12) : "",
+    updatedAt: Number(d.updatedAt) || 0
+  };
+}
+
+function applyDecorToStage(decor) {
+  const next = normalizeDecor(decor);
+  if (STAGE.api && STAGE.api.applyDecor) STAGE.api.applyDecor(next);
+  diag.decor = {
+    carColor: next.carColor,
+    lightTone: next.lightTone,
+    bannerText: next.bannerText,
+    props: { ...next.props },
+    updatedBy: next.updatedBy
+  };
+}
+
+async function saveDecor(patch, opts = {}) {
+  if (!state.me) { openJoin(); toast("먼저 입장해 주세요"); return; }
+  const base = normalizeDecor(state.decor);
+  const next = normalizeDecor({
+    ...base,
+    ...patch,
+    props: { ...base.props, ...(patch.props || {}) },
+    updatedBy: state.me.name,
+    updatedAt: Date.now()
+  });
+  state.decor = next;
+  applyDecorToStage(next);
+  renderDecorUI();
+  try {
+    if (state.mode === "live") {
+      await FB.api.update(FB.api.ref(FB.db, "office/decor"), {
+        carColor: next.carColor,
+        lightTone: next.lightTone,
+        bannerText: next.bannerText,
+        props: next.props,
+        updatedBy: next.updatedBy,
+        updatedAt: FB.api.serverTimestamp()
+      });
+    } else if (LOCAL.data) {
+      LOCAL.data.decor = next;
+      localSave();
+    }
+    if (!opts.quiet) toast("쇼룸을 꾸몄습니다");
+  } catch (e) {
+    console.warn("decor save failed", e);
+    toast("꾸미기 설정을 저장하지 못했어요");
+  }
+}
+
+function renderDecorUI() {
+  const d = normalizeDecor(state.decor);
+  const swatchHost = $("decorColors");
+  if (swatchHost) {
+    swatchHost.querySelectorAll(".decor-swatch").forEach((sw) => {
+      sw.setAttribute("aria-checked", String(sw.dataset.hex.toLowerCase() === d.carColor));
+    });
+  }
+  const lightHost = $("decorLights");
+  if (lightHost) {
+    lightHost.querySelectorAll("[data-tone]").forEach((ch) => {
+      ch.setAttribute("aria-checked", String(ch.dataset.tone === d.lightTone));
+    });
+  }
+  const propHost = $("decorProps");
+  if (propHost) {
+    propHost.querySelectorAll("[data-prop]").forEach((ch) => {
+      ch.setAttribute("aria-pressed", String(!!d.props[ch.dataset.prop]));
+    });
+  }
+  const banner = $("decorBanner");
+  if (banner && document.activeElement !== banner && banner.value !== d.bannerText) {
+    banner.value = d.bannerText;
+  }
+  const meta = $("decorMeta");
+  if (meta) {
+    meta.textContent = d.updatedBy
+      ? `마지막 꾸미기: ${d.updatedBy}${d.updatedAt ? " · " + formatTime(d.updatedAt) : ""}`
+      : "아직 아무도 꾸미지 않았어요. 첫 번째로 꾸며 보세요.";
+  }
+}
+
+function openDecor() {
+  if (!state.me) { openJoin(); toast("입장하면 함께 꾸밀 수 있어요"); return; }
+  renderDecorUI();
+  const dlg = $("decorModal");
+  if (dlg && !dlg.open) dlg.showModal();
+}
+
+function buildDecorControls() {
+  const swatchHost = $("decorColors");
+  if (swatchHost) {
+    swatchHost.innerHTML = DECOR_CAR_COLORS.map((c) => `
+      <button class="swatch decor-swatch" type="button" role="radio" aria-checked="false"
+        style="background:${c.hex}" data-hex="${c.hex}" title="${c.label}" aria-label="차 색상 ${c.label}"></button>`).join("");
+    swatchHost.querySelectorAll(".decor-swatch").forEach((sw) => {
+      sw.addEventListener("click", () => saveDecor({ carColor: sw.dataset.hex }));
+    });
+  }
+
+  const lightHost = $("decorLights");
+  if (lightHost) {
+    lightHost.innerHTML = DECOR_LIGHTS.map((l) => `
+      <button class="decor-chip" type="button" role="radio" aria-checked="false" data-tone="${l.id}">
+        <span class="decor-dot" style="background:${l.dot}" aria-hidden="true"></span>${l.label}
+      </button>`).join("");
+    lightHost.querySelectorAll("[data-tone]").forEach((ch) => {
+      ch.addEventListener("click", () => saveDecor({ lightTone: ch.dataset.tone }));
+    });
+  }
+
+  const propHost = $("decorProps");
+  if (propHost) {
+    propHost.innerHTML = DECOR_PROPS.map((p) => `
+      <button class="decor-chip" type="button" aria-pressed="false" data-prop="${p.id}">
+        <span aria-hidden="true">${p.icon}</span>${p.label}
+      </button>`).join("");
+    propHost.querySelectorAll("[data-prop]").forEach((ch) => {
+      ch.addEventListener("click", () => {
+        const cur = normalizeDecor(state.decor).props;
+        saveDecor({ props: { [ch.dataset.prop]: !cur[ch.dataset.prop] } });
+      });
+    });
+  }
+
+  const picks = $("decorBannerPicks");
+  if (picks) {
+    picks.innerHTML = DECOR_BANNER_PICKS.map((t) =>
+      `<button class="decor-quick-btn" type="button" data-banner="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("");
+    picks.querySelectorAll("[data-banner]").forEach((b) => {
+      b.addEventListener("click", () => {
+        const input = $("decorBanner");
+        if (input) input.value = b.dataset.banner;
+        saveDecor({ bannerText: b.dataset.banner });
+      });
+    });
+  }
+
+  const banner = $("decorBanner");
+  if (banner) {
+    banner.addEventListener("input", () => {
+      clearTimeout(decorSaveTimer);
+      decorSaveTimer = setTimeout(() => saveDecor({ bannerText: banner.value }, { quiet: true }), 600);
+    });
+    banner.addEventListener("change", () => {
+      clearTimeout(decorSaveTimer);
+      saveDecor({ bannerText: banner.value }, { quiet: true });
+    });
+  }
+
+  const decorBtn = $("decorBtn");
+  if (decorBtn) decorBtn.addEventListener("click", openDecor);
+  const decorClose = $("decorClose");
+  if (decorClose) decorClose.addEventListener("click", () => $("decorModal").close());
+  const decorReset = $("decorReset");
+  if (decorReset) {
+    decorReset.addEventListener("click", () => {
+      if (!state.me) { openJoin(); return; }
+      const props = {};
+      DECOR_PROPS.forEach((p) => { props[p.id] = false; });
+      saveDecor({
+        carColor: DECOR_DEFAULTS.carColor,
+        lightTone: DECOR_DEFAULTS.lightTone,
+        bannerText: DECOR_DEFAULTS.bannerText,
+        props
+      });
+    });
+  }
 }
 
 /* ---------------- rendering ---------------- */
@@ -962,6 +1205,8 @@ ${url}
 카드에서 내 상태(대기 중·작업 중·감시 중·회의 중·자리 비움)와 상태 메시지를 바꾸고,
 채팅에서 "@이름 할 일" 처럼 멘션으로 서로 일을 시키면 돼.
 채팅 메시지의 '＋ 보드' 를 누르면 할 일 보드로 바로 올라가.
+쇼룸 위의 '🎨 공간 꾸미기' 를 열면 차 색·조명 톤·배너 문구·3D 소품을 함께 바꿀 수 있어 —
+바꾸는 즉시 모두의 화면에 반영돼.
 
 지금은 ${ROOM_TITLE} 이야. 같이 하자!`;
   const dlg = $("inviteModal");
@@ -1071,6 +1316,7 @@ function wireEvents() {
   $("inviteText").addEventListener("focus", (e) => e.target.select());
 
   /* ---- 3D stage controls ---- */
+  buildDecorControls();
   const seasonSel = $("seasonSelect");
   if (seasonSel) {
     seasonSel.addEventListener("change", () => applySeason(seasonSel.value));
@@ -1143,7 +1389,9 @@ function renderAll() {
 async function boot() {
   wireEvents();
   state.me = loadMe();
+  state.decor = normalizeDecor(null);
   renderAll();
+  renderDecorUI();
   applySeason("auto");
   initStage();
 

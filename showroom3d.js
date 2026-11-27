@@ -149,16 +149,30 @@ function nightTexture() {
 }
 
 function signTexture(text) {
+  const label = String(text == null ? "" : text).trim().slice(0, 24) || "PICKLE MOTORS";
   return canvasTex(1024, 220, (x, w, h) => {
     x.clearRect(0, 0, w, h);
-    x.font = "700 92px 'Pretendard','Segoe UI',system-ui,sans-serif";
     x.textAlign = "center";
     x.textBaseline = "middle";
-    x.letterSpacing = "18px";
     x.shadowColor = "rgba(230,196,138,.85)";
     x.shadowBlur = 26;
     x.fillStyle = "#f0d6a4";
-    x.fillText(text, w / 2, h / 2);
+    const maxW = w * 0.88;
+    const font = (px) => `700 ${px}px 'Pretendard','Segoe UI',system-ui,sans-serif`;
+    let size = 92;
+    let spacing = 18;
+    const widthOf = (px, sp) => {
+      x.font = font(px);
+      return x.measureText(label).width + sp * Math.max(0, label.length - 1);
+    };
+    while (size > 26 && widthOf(size, spacing) > maxW) {
+      size -= 4;
+      spacing = Math.max(3, Math.round(size * 0.19));
+    }
+    x.font = font(size);
+    x.letterSpacing = spacing + "px";
+    // letterSpacing leaves a trailing gap, so nudge back by half of it to stay centred
+    x.fillText(label, w / 2 + spacing / 2, h / 2, maxW);
   });
 }
 
@@ -602,13 +616,16 @@ export function createShowroom(opts = {}) {
     under.material.rotation = Math.PI / 2;
     g.add(under);
 
+    g.userData.paint = paint;
     return g;
   }
 
   const carPivot = new THREE.Group();
   carPivot.position.set(0, 0.225, 0);
-  carPivot.add(buildCar());
+  const carGroup = buildCar();
+  carPivot.add(carGroup);
   platform.add(carPivot);
+  const carPaint = carGroup.userData.paint;
 
   /* ---------- consultation table ---------- */
 
@@ -881,6 +898,344 @@ export function createShowroom(opts = {}) {
   lampLight.position.y = 1.8;
   lampGroup.add(lampLight);
   lounge.add(lampGroup);
+
+  /* ---------- 🎨 shared room decoration (office/decor) ---------- */
+
+  const DECOR_PROP_IDS = ["tree", "gifts", "carpet", "plants", "welcomeStand", "spotlights"];
+
+  const LIGHT_TONES = {
+    gold:    { main: 0xffc978, second: 0xffd9a4, ring: 0xffc978, intensity: 13 },
+    warm:    { main: 0xff9a5c, second: 0xffb37a, ring: 0xffb066, intensity: 12 },
+    cool:    { main: 0x9fc8ff, second: 0xc6e0ff, ring: 0xa8d4ff, intensity: 12 },
+    emerald: { main: 0x46d69a, second: 0x8ff0c8, ring: 0x6fe8b4, intensity: 11 },
+    festive: { main: 0xff5b6a, second: 0x46d69a, ring: 0xff8a6a, intensity: 12 }
+  };
+
+  const decorState = {
+    carColor: "#17493c",
+    lightTone: "gold",
+    bannerText: "PICKLE MOTORS",
+    props: { tree: false, gifts: false, carpet: false, plants: false, welcomeStand: false, spotlights: false }
+  };
+  const carColorTarget = new THREE.Color(0x17493c);
+  const ringTarget = new THREE.Color(0xffc978);
+  const poolTarget = new THREE.Color(0xffbf72);
+
+  const decorGroup = new THREE.Group();
+  decorGroup.name = "decor";
+  world.add(decorGroup);
+
+  const decorLightGroup = new THREE.Group();
+  decorLightGroup.name = "decorLights";
+  world.add(decorLightGroup);
+
+  const decorLights = [
+    { pos: [-3.9, 2.9, 2.6], dist: 15, weight: 1 },
+    { pos: [3.9, 2.9, 2.6], dist: 15, weight: 1 },
+    { pos: [0.2, 3.3, -4.2], dist: 16, weight: 0.8 }
+  ].map((spec) => {
+    const light = new THREE.PointLight(0xffc978, 0, spec.dist, 2);
+    light.position.set(spec.pos[0], spec.pos[1], spec.pos[2]);
+    decorLightGroup.add(light);
+    return {
+      light, weight: spec.weight,
+      target: new THREE.Color(0xffc978),
+      intensity: 0, targetIntensity: 0
+    };
+  });
+
+  function setToneTargets(id) {
+    const tone = LIGHT_TONES[id] || LIGHT_TONES.gold;
+    const festive = id === "festive";
+    decorLights.forEach((d, i) => {
+      const hex = festive ? [0xff5b6a, 0x46d69a, 0xffd98a][i] : (i === 2 ? tone.second : tone.main);
+      d.target.set(hex);
+      d.targetIntensity = tone.intensity * d.weight;
+    });
+    ringTarget.set(tone.ring);
+    poolTarget.set(tone.ring);
+  }
+
+  function applyBanner(text) {
+    const next = signTexture(text);
+    const prev = sign.material.map;
+    sign.material.map = next;
+    sign.material.needsUpdate = true;
+    if (prev && prev.dispose) prev.dispose();
+  }
+
+  /* --- toggleable props --- */
+
+  function propTree() {
+    const g = new THREE.Group();
+    g.position.set(-2.55, 0, -4.75);
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.27, 0.5, 18), MAT.charcoal);
+    pot.position.y = 0.25;
+    pot.castShadow = true;
+    pot.receiveShadow = true;
+    g.add(pot);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.022, 8, 26), MAT.gold);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = 0.5;
+    g.add(rim);
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.085, 1.5, 10), MAT.wood);
+    trunk.position.y = 1.2;
+    g.add(trunk);
+    const leafA = new THREE.MeshStandardMaterial({ color: 0x2f7d58, roughness: 0.8, metalness: 0.04 });
+    const leafB = new THREE.MeshStandardMaterial({ color: 0x1f6448, roughness: 0.84, metalness: 0.04 });
+    [[1.62, 0.72], [1.98, 0.6], [2.3, 0.47], [2.55, 0.34]].forEach(([y, r], li) => {
+      const count = li === 3 ? 3 : 5;
+      for (let k = 0; k < count; k++) {
+        const a = (k / count) * TAU + li * 0.6;
+        const clump = new THREE.Mesh(new THREE.SphereGeometry(r * rand(0.6, 0.78), 10, 8), li % 2 ? leafB : leafA);
+        clump.position.set(Math.cos(a) * r * 0.5, y, Math.sin(a) * r * 0.5);
+        clump.scale.y = 0.8;
+        clump.castShadow = true;
+        g.add(clump);
+      }
+    });
+    return g;
+  }
+
+  function propGifts() {
+    const g = new THREE.Group();
+    g.position.set(2.85, 0, 4.95);
+    g.rotation.y = -0.35;
+    [[0, 0, 0.5, 0xb3263a], [0.66, 0.16, 0.38, 0x1f6b4d], [-0.18, -0.62, 0.34, 0xe6c48a]]
+      .forEach(([dx, dz, size, color]) => {
+        const box = new THREE.Group();
+        const b = new THREE.Mesh(
+          new RoundedBoxGeometry(size, size * 0.78, size, 3, 0.02),
+          new THREE.MeshStandardMaterial({ color, roughness: 0.52, metalness: 0.12 })
+        );
+        b.position.y = size * 0.39;
+        b.castShadow = true;
+        box.add(b);
+        const rb1 = new THREE.Mesh(new THREE.BoxGeometry(size * 1.03, size * 0.8, size * 0.16), MAT.gold);
+        rb1.position.y = size * 0.39;
+        box.add(rb1);
+        const rb2 = new THREE.Mesh(new THREE.BoxGeometry(size * 0.16, size * 0.8, size * 1.03), MAT.gold);
+        rb2.position.y = size * 0.39;
+        box.add(rb2);
+        const bow = new THREE.Mesh(new THREE.TorusGeometry(size * 0.16, size * 0.035, 6, 14), MAT.gold);
+        bow.rotation.x = Math.PI / 2;
+        bow.position.y = size * 0.8;
+        box.add(bow);
+        box.position.set(dx, 0, dz);
+        box.rotation.y = rand(-0.5, 0.5);
+        g.add(box);
+      });
+    return g;
+  }
+
+  function propCarpet() {
+    const g = new THREE.Group();
+    const velvet = new THREE.MeshStandardMaterial({ color: 0x8c1522, roughness: 0.95, metalness: 0.02 });
+    const trimMat = new THREE.MeshStandardMaterial({ color: 0xe6c48a, roughness: 0.45, metalness: 0.55 });
+    const mat = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 6.4), velvet);
+    mat.rotation.x = -Math.PI / 2;
+    mat.position.set(0, 0.007, 0);
+    mat.receiveShadow = true;
+    g.add(mat);
+    [-1.76, 1.76].forEach((x) => {
+      const trim = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 6.4), trimMat);
+      trim.rotation.x = -Math.PI / 2;
+      trim.position.set(x, 0.009, 0);
+      g.add(trim);
+    });
+    [3.16, -3.16].forEach((z) => {
+      const trim = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 0.1), trimMat);
+      trim.rotation.x = -Math.PI / 2;
+      trim.position.set(0, 0.009, z);
+      g.add(trim);
+    });
+    g.position.set(0, 0, 5.6);
+    return g;
+  }
+
+  function pottedPlant(scale) {
+    const p = new THREE.Group();
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.23, 0.56, 18), MAT.charcoal);
+    pot.position.y = 0.28;
+    pot.castShadow = true;
+    p.add(pot);
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.018, 8, 24), MAT.gold);
+    band.rotation.x = Math.PI / 2;
+    band.position.y = 0.54;
+    p.add(band);
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x2f7d58, roughness: 0.8, metalness: 0.04 });
+    const leafMat2 = new THREE.MeshStandardMaterial({ color: 0x1f6b4d, roughness: 0.84, metalness: 0.04 });
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * TAU;
+      const r = rand(0.05, 0.2);
+      const clump = new THREE.Mesh(new THREE.SphereGeometry(rand(0.14, 0.22), 10, 8), i % 2 ? leafMat : leafMat2);
+      clump.position.set(Math.cos(a) * r, rand(0.66, 1.0), Math.sin(a) * r);
+      clump.scale.y = 0.85;
+      clump.castShadow = true;
+      p.add(clump);
+    }
+    p.scale.setScalar(scale);
+    return p;
+  }
+
+  function propPlants() {
+    const g = new THREE.Group();
+    const a = pottedPlant(1.05);
+    a.position.set(-4.95, 0, 5.35);
+    g.add(a);
+    const b = pottedPlant(0.9);
+    b.position.set(5.05, 0, 5.15);
+    g.add(b);
+    return g;
+  }
+
+  function welcomeTex() {
+    return canvasTex(512, 384, (x, w, h) => {
+      const bg = x.createLinearGradient(0, 0, 0, h);
+      bg.addColorStop(0, "#161d28");
+      bg.addColorStop(1, "#090d13");
+      x.fillStyle = bg;
+      x.fillRect(0, 0, w, h);
+      x.strokeStyle = "rgba(230,196,138,.75)";
+      x.lineWidth = 7;
+      x.strokeRect(18, 18, w - 36, h - 36);
+      x.textAlign = "center";
+      x.fillStyle = "#f2dcae";
+      x.font = "700 76px 'Pretendard','Segoe UI',system-ui,sans-serif";
+      x.fillText("WELCOME", w / 2, 152);
+      x.fillStyle = "rgba(240,226,200,.88)";
+      x.font = "600 30px 'Pretendard','Segoe UI',system-ui,sans-serif";
+      x.fillText("함께 꾸미는 쇼룸", w / 2, 224);
+      x.fillStyle = "rgba(190,204,224,.72)";
+      x.font = "500 24px 'Pretendard','Segoe UI',system-ui,sans-serif";
+      x.fillText("PICKLE MOTORS", w / 2, 288);
+    });
+  }
+
+  function propWelcomeStand() {
+    const g = new THREE.Group();
+    g.position.set(4.2, 0, 6.35);
+    g.rotation.y = -0.5;
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.05, 20), MAT.darkMetal);
+    foot.position.y = 0.03;
+    g.add(foot);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 1.35, 10), MAT.darkMetal);
+    pole.position.y = 0.68;
+    g.add(pole);
+    const board = new THREE.Mesh(new RoundedBoxGeometry(0.86, 0.64, 0.05, 4, 0.02), MAT.charcoal);
+    board.position.set(0, 1.62, 0);
+    board.rotation.x = -0.16;
+    board.castShadow = true;
+    g.add(board);
+    const face = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.8, 0.58),
+      new THREE.MeshBasicMaterial({ map: welcomeTex() })
+    );
+    face.position.set(0, 1.62, 0.029);
+    face.rotation.x = -0.16;
+    g.add(face);
+    const lamp = new THREE.PointLight(0xffd9a8, 3.2, 3, 2);
+    lamp.position.set(0, 1.58, 0.32);
+    g.add(lamp);
+    return g;
+  }
+
+  function propSpotlights() {
+    const g = new THREE.Group();
+    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 5.4, 10), MAT.darkMetal);
+    bar.rotation.z = Math.PI / 2;
+    bar.position.set(0, 4.32, 3.5);
+    g.add(bar);
+    [-2.1, 0, 2.1].forEach((x) => {
+      const fix = new THREE.Group();
+      fix.position.set(x, 4.2, 3.5);
+      fix.rotation.x = 0.46;
+      const can = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.19, 0.36, 16), MAT.darkMetal);
+      can.castShadow = true;
+      fix.add(can);
+      const lens = new THREE.Mesh(new THREE.CircleGeometry(0.17, 18), new THREE.MeshBasicMaterial({ color: 0xfff5de }));
+      lens.rotation.x = -Math.PI / 2;
+      lens.position.y = -0.19;
+      fix.add(lens);
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: GLOW_TEX, color: 0xffe9c4, transparent: true, opacity: 0.6,
+        blending: THREE.AdditiveBlending, depthWrite: false
+      }));
+      halo.scale.set(1.15, 1.15, 1);
+      halo.position.y = -0.24;
+      fix.add(halo);
+      const beam = new THREE.Mesh(
+        new THREE.ConeGeometry(0.95, 3.1, 22, 1, true),
+        new THREE.MeshBasicMaterial({
+          color: 0xffe3b0, transparent: true, opacity: 0.06, side: THREE.DoubleSide,
+          depthWrite: false, blending: THREE.AdditiveBlending
+        })
+      );
+      beam.position.y = -1.6;
+      fix.add(beam);
+      const tgt = new THREE.Object3D();
+      tgt.position.set(0, -4.2, -0.2);
+      fix.add(tgt);
+      const spot = new THREE.SpotLight(0xfff1d6, 42, 13, 0.4, 0.6, 1.3);
+      spot.position.set(0, -0.15, 0);
+      spot.target = tgt;
+      fix.add(spot);
+      g.add(fix);
+    });
+    return g;
+  }
+
+  const decorProps = new Map();
+
+  function registerProp(id, group) {
+    const lights = [];
+    group.traverse((o) => { if (o.isLight) lights.push(o); });
+    lights.forEach((l) => { l.visible = false; });
+    group.visible = false;
+    group.scale.setScalar(0.0001);
+    decorGroup.add(group);
+    decorProps.set(id, { group, lights, cur: 0, target: 0 });
+  }
+
+  registerProp("tree", propTree());
+  registerProp("gifts", propGifts());
+  registerProp("carpet", propCarpet());
+  registerProp("plants", propPlants());
+  registerProp("welcomeStand", propWelcomeStand());
+  registerProp("spotlights", propSpotlights());
+
+  function applyDecor(raw) {
+    if (!raw || typeof raw !== "object") return;
+    if (typeof raw.carColor === "string" && /^#[0-9a-fA-F]{6}$/.test(raw.carColor)) {
+      const hex = raw.carColor.toLowerCase();
+      if (hex !== decorState.carColor) {
+        decorState.carColor = hex;
+        carColorTarget.set(hex);
+      }
+    }
+    if (raw.lightTone && LIGHT_TONES[raw.lightTone] && raw.lightTone !== decorState.lightTone) {
+      decorState.lightTone = raw.lightTone;
+      setToneTargets(raw.lightTone);
+    }
+    if (typeof raw.bannerText === "string") {
+      const text = raw.bannerText.trim().slice(0, 24) || "PICKLE MOTORS";
+      if (text !== decorState.bannerText) {
+        decorState.bannerText = text;
+        applyBanner(text);
+      }
+    }
+    if (raw.props && typeof raw.props === "object") {
+      DECOR_PROP_IDS.forEach((id) => {
+        const on = raw.props[id] === true;
+        if (decorState.props[id] === on) return;
+        decorState.props[id] = on;
+        const rec = decorProps.get(id);
+        if (rec) rec.target = on ? 1 : 0;
+      });
+    }
+  }
+
+  setToneTargets(decorState.lightTone);
 
   /* ---------- zone markers (CSS2D) ---------- */
 
@@ -1588,6 +1943,32 @@ export function createShowroom(opts = {}) {
       carPivot.rotation.y += dt * 0.055;
     }
 
+    /* 🎨 shared decor: paint, light tone and props ease into place */
+    const decorK = 1 - Math.pow(0.0016, dt);
+    if (carPaint) carPaint.color.lerp(carColorTarget, decorK);
+    ringGlow.material.color.lerp(ringTarget, decorK);
+    poolGlow.material.color.lerp(poolTarget, decorK);
+    for (let i = 0; i < decorLights.length; i++) {
+      const d = decorLights[i];
+      d.light.color.lerp(d.target, decorK);
+      d.light.intensity += (d.targetIntensity - d.light.intensity) * decorK;
+    }
+    decorProps.forEach((rec) => {
+      if (rec.cur !== rec.target) {
+        rec.cur += (rec.target - rec.cur) * (1 - Math.pow(0.0008, dt));
+        if (Math.abs(rec.target - rec.cur) < 0.004) rec.cur = rec.target;
+      }
+      const on = rec.cur > 0.004;
+      if (rec.group.visible !== on) {
+        rec.group.visible = on;
+        rec.lights.forEach((l) => { l.visible = on; });
+      }
+      if (on) {
+        const pop = rec.cur < 1 ? 1 + Math.sin(Math.min(1, rec.cur) * Math.PI) * 0.055 : 1;
+        rec.group.scale.setScalar(Math.max(0.0001, rec.cur * pop));
+      }
+    });
+
     people.forEach((rec) => {
       if (rec.anchorTarget) {
         const k = 1 - Math.pow(0.0012, dt);
@@ -1656,6 +2037,10 @@ export function createShowroom(opts = {}) {
 
   return {
     syncPeople,
+    applyDecor,
+    decor() {
+      return { carColor: decorState.carColor, lightTone: decorState.lightTone, bannerText: decorState.bannerText, props: { ...decorState.props } };
+    },
     setSeason(id, flags) {
       currentSeason = id || "christmas";
       buildSeason(currentSeason, flags || {});
