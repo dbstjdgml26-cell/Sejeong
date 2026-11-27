@@ -705,9 +705,8 @@ body{
   .panel-head h2{font-size:13.5px}
   .season-bar{margin-left:0;width:100%;justify-content:flex-start}
   .stage{height:clamp(320px,50vh,440px);border-radius:15px}
-  .stage-presets{top:8px;right:8px;gap:4px;left:8px;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
-  .stage-presets::-webkit-scrollbar{display:none}
-  .cam-btn{font-size:10.5px;padding:6px 9px;flex:none}
+  .stage-presets{top:8px;right:8px;gap:4px;left:8px;justify-content:flex-start;flex-wrap:wrap}
+  .cam-btn{font-size:10.5px;padding:6px 8px}
   .stage-chips{left:8px;bottom:8px;gap:4px}
   .zone-chip{font-size:9.5px;padding:4px 7px}
   .seat-dock{padding:9px 10px}
@@ -735,7 +734,7 @@ body{
 @media (max-width:560px){
   .c3d-top{padding:3px 7px 3px 8px;gap:4px}
   .c3d-name{font-size:9.5px}
-  .c3d-status{font-size:8px;padding:0 4px}
+  .c3d-status{display:none}
   .zone-flag{font-size:8.5px;padding:2px 7px;letter-spacing:.1em}
   .zone-flag-icon{font-size:9px}
 }
