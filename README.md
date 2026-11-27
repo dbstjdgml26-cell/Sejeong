@@ -23,7 +23,6 @@
 - 쇼룸 채팅: `@이름` 멘션, 멘션 칩, 메시지를 할 일 보드로 보내기
 - 할 일 보드: 담당 피클 지정, `대기 → 진행 중 → 완료` 이동, 삭제
 - 초대: 헤더의 `＋ 피클 초대` — 링크와 안내문을 복사해 다른 피클에게 전달
-
 ## 시즌 테마 (자동)
 
 접속한 날짜(한국 시간)로 시즌을 판단해 3D 소품·조명·파티클을 자동으로 바꿉니다.
@@ -38,13 +37,31 @@
 
 기본값은 `자동 (현재 시즌)`이고, 패널 헤더의 셀렉터로 다른 시즌을 미리 볼 수 있습니다.
 
+## 🎨 공간 꾸미기 (함께, 실시간)
+
+쇼룸 헤더의 `🎨 공간 꾸미기` 를 열면 입장한 피클 **누구나** 쇼룸을 꾸밀 수 있고,
+같은 쇼룸에 접속한 모든 피클의 3D 화면이 즉시 같이 바뀝니다(시즌 테마 위에 겹쳐 적용).
+
+| 항목 | 값 |
+| --- | --- |
+| 차 색상 | 펄 화이트 `#f4f6fb` · 미드나잇 블랙 `#1a202c` · 딥 블루 `#2563eb` · 카민 레드 `#b91c1c` · 메탈릭 실버 `#94a3b8` · 포레스트 그린 `#0f766e` · 딥 그린 `#17493c`(기본) |
+| 조명 톤 | `gold`(기본) · `warm` · `cool` · `emerald` · `festive` |
+| 배너 문구 | 벽면 사인 텍스트 (최대 24자, 길이에 맞춰 자동 축소) |
+| 소품 | `tree` 🌲 · `gifts` 🎁 · `carpet` 🟥 레드카펫 · `plants` 🪴 · `welcomeStand` 🪧 · `spotlights` 💡 |
+| 표시 | `updatedBy` 마지막으로 꾸민 피클 이름 · `updatedAt` 시각 |
+
+- 값은 `office/decor` 한 노드에 모여 있고, 바꾸는 사람의 이름이 `updatedBy` 에 남습니다.
+- 다른 피클이 꾸미면 토스트로 "○○ 님이 공간을 꾸몄어요" 가 뜨고 3D가 부드럽게 따라갑니다(색 보간·소품 스케일).
+- `기본값으로` 를 누르면 원래 쇼룸 모습(딥 그린·골드·소품 없음)으로 돌아갑니다.
+
 ## 데이터 구조
 
 ```
 office
 ├─ presence/{pid}   { name, consonant, color, zone, status, message, ts }
 ├─ messages/{mid}   { name, pid, consonant, color, text, createdAt }
-└─ tasks/{tid}      { title, assignee, assigneeColor, assigneeConsonant, status, createdAt }
+├─ tasks/{tid}      { title, assignee, assigneeColor, assigneeConsonant, status, createdAt }
+└─ decor            { carColor, lightTone, bannerText, props{tree,gifts,carpet,plants,welcomeStand,spotlights}, updatedBy, updatedAt }
 ```
 
 - 접속 중일 때만 presence 가 유지됩니다(`onDisconnect().remove()`).

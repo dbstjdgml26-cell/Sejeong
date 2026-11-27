@@ -25,10 +25,10 @@
         }
       },
       "decor": {
-        ".validate": "newData.hasChildren(['carColor','lightTone','bannerText'])",
-        "carColor": { ".validate": "newData.isString() && newData.val().matches(/^#[0-9a-fA-F]{6}$/)" },
-        "lightTone": { ".validate": "newData.isString() && newData.val().matches(/^(gold|warm|cool|emerald|festive)$/)" },
-        "bannerText": { ".validate": "newData.isString() && newData.val().length <= 24" },
+        ".validate": "newData.hasChildren(['carColor','lightTone','bannerText']) || !newData.exists()",
+        "carColor": { ".validate": "!newData.exists() || (newData.isString() && newData.val().matches(/^#[0-9a-fA-F]{6}$/))" },
+        "lightTone": { ".validate": "!newData.exists() || (newData.isString() && newData.val().matches(/^(gold|warm|cool|emerald|festive)$/))" },
+        "bannerText": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 24)" },
         "updatedBy": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 12)" },
         "updatedAt": { ".validate": "!newData.exists() || newData.isNumber()" },
         "props": {
