@@ -4,28 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>성희의 합동 비서실 · PICKLE MOTORS</title>
-<meta name="description" content="피클들이 함께 쓰는 실시간 합동 쇼룸 — 쇼룸 맵, 채팅, 할 일 보드.">
-<meta name="theme-color" content="#08090c">
+<meta name="description" content="피클들이 함께 쓰는 따뜻한 클레이 쇼룸 — 오피스 맵, 회의실, 작업실.">
+<meta name="theme-color" content="#FBF5EC">
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://sejeong-pickle-office-default-rtdb.asia-southeast1.firebasedatabase.app" crossorigin>
 <link rel="dns-prefetch" href="https://www.gstatic.com">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='28' fill='%238b5cf6'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif'%3E%E3%85%85%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css?v=20261127e">
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
-  }
-}
-</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='30' fill='%23F3E3CE'/%3E%3Ccircle cx='36' cy='40' r='6' fill='%235B3A22'/%3E%3Ccircle cx='64' cy='40' r='6' fill='%235B3A22'/%3E%3Cpath d='M36 64c8 8 20 8 28 0' stroke='%235B3A22' stroke-width='5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css?v=20261127clay2">
 </head>
-<body>
+<body data-view="map">
 <div class="ambient" aria-hidden="true">
-  <span class="spot spot-a"></span>
-  <span class="spot spot-b"></span>
-  <span class="spot spot-c"></span>
-  <span class="grid-floor"></span>
+  <span class="blob blob-a"></span>
+  <span class="blob blob-b"></span>
+  <span class="blob blob-c"></span>
 </div>
 
 <header class="topbar">
@@ -33,7 +24,7 @@
     <div class="brand-mark" aria-hidden="true"><span class="brand-eyes"></span><span>ㅅ</span></div>
     <div class="brand-text">
       <h1>성희의 합동 비서실</h1>
-      <p>PICKLE MOTORS <span class="dot">·</span> SHOWROOM FLOOR</p>
+      <p>PICKLE MOTORS <span class="dot">·</span> SHOWROOM</p>
     </div>
   </div>
   <div class="topbar-actions">
@@ -46,132 +37,129 @@
   </div>
 </header>
 
-<main class="layout">
-  <section class="map panel" aria-labelledby="mapTitle">
-    <div class="panel-head">
-      <h2 id="mapTitle">쇼룸 맵</h2>
-      <div class="season-bar">
-        <span id="seasonBadge" class="season-badge" role="status" aria-live="polite">🎄 크리스마스 시즌 자동 적용</span>
-        <label class="season-pick">
-          <span class="sr-only">시즌 테마 미리보기</span>
-          <select id="seasonSelect" class="season-select" aria-label="시즌 테마">
-            <option value="auto">자동 (현재 시즌)</option>
-            <option value="christmas">🎄 크리스마스</option>
-            <option value="winter">❄️ 새해·겨울</option>
-            <option value="spring">🌸 봄·벚꽃</option>
-            <option value="summer">🌴 여름</option>
-            <option value="autumn">🍂 가을·할로윈</option>
-          </select>
-        </label>
+<main class="shell">
+  <section class="hello" aria-label="비서실 현황">
+    <p class="hello-kicker">👑 합동 비서실 본부</p>
+    <h2 class="hello-title" id="helloTitle">대장님, 비서가 아직 없어요</h2>
+    <p class="hello-sub" id="helloSub">아래 방을 눌러 들어가면 내 캐릭터가 그 자리에 섭니다.</p>
+  </section>
+
+  <div class="controlbar">
+    <div class="tabs" role="tablist" aria-label="화면 전환">
+      <button class="tab is-on" type="button" role="tab" aria-selected="true" data-view="map"><span aria-hidden="true">🗺️</span> 오피스 맵</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-view="chat"><span aria-hidden="true">💬</span> 회의실</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-view="board"><span aria-hidden="true">📋</span> 작업실</button>
+    </div>
+    <div class="stats">
+      <span class="stat" id="roomStat"><i class="led"></i><span>0개 방 가동</span></span>
+      <span class="stat" id="peopleStat"><span aria-hidden="true">👥</span><span>ON 0명</span></span>
+      <button class="motion is-on" id="motionBtn" type="button" aria-pressed="true">✨ 움직임 <b>ON</b></button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <section class="panel map" data-panel="map" aria-labelledby="mapTitle">
+      <div class="panel-head">
+        <h2 id="mapTitle">오피스 맵</h2>
+        <span class="head-hint">캐릭터를 누르면 상태가 보여요</span>
         <button id="decorBtn" class="decor-btn" type="button" aria-haspopup="dialog">🎨 공간 꾸미기</button>
       </div>
-    </div>
 
-    <div class="stage" id="stage3d" data-season="christmas">
-      <canvas id="scene3d" aria-label="3D 자동차 전시장 — 드래그로 회전, 휠로 확대"></canvas>
-      <div class="stage-presets" id="cameraPresets" role="group" aria-label="카메라 시점">
-        <button type="button" class="cam-btn" data-cam="overview">전체 보기</button>
-        <button type="button" class="cam-btn" data-cam="showroom">🚘 메인 쇼룸</button>
-        <button type="button" class="cam-btn" data-cam="desk">🤝 상담 테이블</button>
-        <button type="button" class="cam-btn" data-cam="lounge">☕ 고객 라운지</button>
+      <div class="map-stage" id="mapStage">
+        <img id="mapImg" class="map-img" src="assets/showroom-map.png"
+             alt="따뜻한 클레이 오피스 쇼룸 — 메인 쇼룸 데스크, 상담 테이블, 고객 라운지">
+        <div class="map-loading" id="mapLoading"><span class="spinner"></span>오피스 맵 준비 중…</div>
       </div>
-      <div class="stage-chips" id="stageZoneList" role="group" aria-label="구역별 인원"></div>
-      <p class="stage-hint">드래그로 회전 · 휠·두 손가락으로 확대 · 캐릭터를 누르면 상태가 보여요</p>
-      <div class="stage-loading" id="stageLoading"><span class="spinner"></span>3D 쇼룸 준비 중…</div>
+
       <div class="stage-fallback" id="stageFallback" hidden>
         <p class="fallback-note" id="stageFallbackNote">2D 맵으로 표시합니다.</p>
         <div class="zones" id="zones"></div>
       </div>
-    </div>
 
-    <div class="seat-dock" id="seatDock">
-      <div class="dock-guest" id="dockGuest">
-        <span class="dock-badge" aria-hidden="true">ㅅ</span>
-        <p>쇼룸에 입장하면 3D 캐릭터로 서고, 내 자리와 상태를 바꿀 수 있어요.</p>
-        <button class="btn btn-primary" type="button" id="dockJoin">입장하기</button>
-      </div>
-      <div class="dock-me" id="dockMe" hidden>
-        <div class="dock-id">
-          <div class="critter sm" id="dockCritter" style="--c:#8b5cf6"><span class="eyes"></span><span class="consonant">ㅅ</span></div>
-          <div class="dock-meta">
-            <b id="dockName">성희</b>
-            <span id="dockWhere">메인 쇼룸 · 대기 중</span>
+      <div class="seat-dock" id="seatDock">
+        <div class="dock-guest" id="dockGuest">
+          <div class="dock-avatar is-empty" aria-hidden="true"><span class="eyes"></span><span class="consonant">?</span></div>
+          <p>내 캐릭터를 고르면 이 맵에 서요. 자리는 언제든 옮길 수 있어요.</p>
+          <button class="btn btn-primary" type="button" id="dockJoin">입장하기</button>
+        </div>
+        <div class="dock-me" id="dockMe" hidden>
+          <div class="dock-id">
+            <div class="dock-avatar" id="dockCritter" style="--c:#C0263C"><span class="eyes"></span><span class="consonant">ㅅ</span></div>
+            <div class="dock-meta">
+              <b id="dockName">성희</b>
+              <span id="dockWhere">메인 쇼룸 · 대기 중</span>
+            </div>
           </div>
+          <div class="dock-move" role="group" aria-label="내 자리 이동">
+            <button class="zone-btn" type="button" data-to="showroom">🚘 메인 쇼룸</button>
+            <button class="zone-btn" type="button" data-to="desk">🤝 상담 테이블</button>
+            <button class="zone-btn" type="button" data-to="lounge">☕ 고객 라운지</button>
+          </div>
+          <select class="seat-select" id="dockStatus" aria-label="내 상태"></select>
+          <input class="seat-msg-input" id="dockMsg" type="text" maxlength="140" placeholder="상태 메시지" aria-label="상태 메시지">
         </div>
-        <div class="dock-move" role="group" aria-label="내 자리 이동">
-          <button class="zone-btn is-tall" type="button" data-to="showroom">🚘 메인 쇼룸</button>
-          <button class="zone-btn is-tall" type="button" data-to="desk">🤝 상담 테이블</button>
-          <button class="zone-btn is-tall" type="button" data-to="lounge">☕ 고객 라운지</button>
-        </div>
-        <select class="seat-select is-tall" id="dockStatus" aria-label="내 상태"></select>
-        <input class="seat-msg-input is-tall" id="dockMsg" type="text" maxlength="140" placeholder="상태 메시지" aria-label="상태 메시지">
       </div>
-    </div>
 
-    <p class="map-note">내 캐릭터의 자리·상태는 나만 바꿀 수 있어요. 다른 피클은 초대 링크로 입장해 각자 자리를 잡습니다.</p>
-  </section>
+      <p class="map-note">내 자리·상태는 나만 바꿀 수 있어요. 다른 피클은 초대 링크로 들어와 각자 캐릭터를 세웁니다.</p>
+    </section>
 
-  <section class="panel chat" aria-labelledby="chatTitle">
-    <div class="panel-head">
-      <h2 id="chatTitle">쇼룸 채팅</h2>
-      <span class="head-hint">@이름 으로 일 시키기</span>
-    </div>
-    <div id="chatFeed" class="chat-feed" role="log" aria-live="polite" aria-relevant="additions text"></div>
-    <div class="mention-bar">
-      <span class="mention-label">멘션</span>
-      <div id="mentionChips" class="mention-chips"></div>
-    </div>
-    <form id="chatForm" class="chat-form" autocomplete="off">
-      <input id="chatInput" class="input" type="text" maxlength="500" placeholder="메시지 · @성희 이거 확인해줘" aria-label="채팅 메시지">
-      <button class="btn btn-send" type="submit" aria-label="보내기">보내기</button>
-    </form>
-  </section>
+    <section class="panel chat" data-panel="chat" aria-labelledby="chatTitle">
+      <div class="panel-head">
+        <h2 id="chatTitle">회의실</h2>
+        <span class="head-hint">@이름 으로 일 시키기</span>
+      </div>
+      <div id="chatFeed" class="chat-feed" role="log" aria-live="polite" aria-relevant="additions text"></div>
+      <div class="mention-bar">
+        <span class="mention-label">멘션</span>
+        <div id="mentionChips" class="mention-chips"></div>
+      </div>
+      <form id="chatForm" class="chat-form" autocomplete="off">
+        <input id="chatInput" class="input" type="text" maxlength="500" placeholder="메시지 · @성희 이거 확인해줘" aria-label="채팅 메시지">
+        <button class="btn btn-send" type="submit" aria-label="보내기">보내기</button>
+      </form>
+    </section>
 
-  <section class="panel board" aria-labelledby="boardTitle">
-    <div class="panel-head">
-      <h2 id="boardTitle">할 일 보드</h2>
-      <span class="head-hint" id="boardCount">0개</span>
-    </div>
-    <form id="taskForm" class="task-form" autocomplete="off">
-      <input id="taskInput" class="input" type="text" maxlength="200" placeholder="새 할 일" aria-label="새 할 일">
-      <select id="taskAssignee" class="input select" aria-label="담당 피클"></select>
-      <button class="btn btn-add" type="submit">추가</button>
-    </form>
-    <div id="taskColumns" class="task-columns"></div>
-  </section>
+    <section class="panel board" data-panel="board" aria-labelledby="boardTitle">
+      <div class="panel-head">
+        <h2 id="boardTitle">작업실</h2>
+        <span class="head-hint" id="boardCount">0개</span>
+      </div>
+      <form id="taskForm" class="task-form" autocomplete="off">
+        <input id="taskInput" class="input" type="text" maxlength="200" placeholder="새 할 일" aria-label="새 할 일">
+        <select id="taskAssignee" class="input select" aria-label="담당 피클"></select>
+        <button class="btn btn-add" type="submit">추가</button>
+      </form>
+      <div id="taskColumns" class="task-columns"></div>
+    </section>
+  </div>
+
+  <footer class="foot">
+    <span>실시간 공유 · 데이터는 Firebase Realtime Database 에 저장됩니다</span>
+    <span class="foot-dot">·</span>
+    <span>개인정보 없이 운영되는 쇼룸</span>
+  </footer>
 </main>
-
-<footer class="foot">
-  <span>실시간 공유 · 데이터는 Firebase Realtime Database 에 저장됩니다</span>
-  <span class="foot-dot">·</span>
-  <span>개인정보 없이 운영되는 쇼룸</span>
-</footer>
 
 <!-- 입장 -->
 <dialog id="joinModal" class="modal">
   <form method="dialog" class="modal-inner" id="joinForm">
     <p class="modal-eyebrow">PICKLE MOTORS</p>
     <h3 class="modal-title" id="joinTitle">쇼룸 입장</h3>
-    <p class="modal-sub">이름과 자음, 색을 고르면 쇼룸에 설 수 있어요. 초대받았다면 내 피클 이름으로 바꿔 주세요.</p>
+    <p class="modal-sub">니케 캐릭터 하나를 골라 내 자리에 세워 주세요. 초대받았다면 내 피클 이름으로 바꿔 주세요.</p>
 
     <label class="field">
       <span>이름</span>
       <input id="joinName" class="input" type="text" maxlength="12" placeholder="예: 성희" required>
     </label>
 
-    <label class="field">
-      <span>자음</span>
-      <input id="joinConsonant" class="input input-consonant" type="text" maxlength="2" placeholder="ㅅ" required>
-    </label>
-
     <div class="field">
-      <span>컬러</span>
-      <div id="joinColors" class="swatches" role="radiogroup" aria-label="캐릭터 색"></div>
+      <span>내 캐릭터</span>
+      <div id="joinChars" class="charpick" role="radiogroup" aria-label="내 캐릭터"></div>
     </div>
 
     <div class="modal-preview">
-      <div class="critter preview-critter" id="joinPreview"><span class="eyes"></span><span class="consonant">ㅅ</span></div>
-      <p id="joinPreviewText">성희 · ㅅ</p>
+      <div class="preview-fig" id="joinPreview"><span class="eyes"></span><span class="consonant">ㅅ</span></div>
+      <p id="joinPreviewText">성희 · 홍련:흑영</p>
     </div>
 
     <div class="modal-actions">
@@ -186,7 +174,7 @@
   <div class="modal-inner">
     <p class="modal-eyebrow">INVITE A PICKLE</p>
     <h3 class="modal-title">다른 피클 초대</h3>
-    <p class="modal-sub">아래 링크와 안내문을 그대로 전해 주세요. 받은 피클은 자기 이름·자음·색으로 입장합니다.</p>
+    <p class="modal-sub">아래 링크와 안내문을 그대로 전해 주세요. 받은 피클은 자기 이름과 캐릭터로 입장합니다.</p>
 
     <label class="field">
       <span>쇼룸 주소</span>
@@ -198,7 +186,7 @@
 
     <label class="field">
       <span>함께 보낼 안내문</span>
-      <textarea id="inviteText" class="input textarea" rows="10" readonly></textarea>
+      <textarea id="inviteText" class="input textarea" rows="11" readonly></textarea>
     </label>
 
     <div class="modal-actions">
@@ -213,18 +201,14 @@
   <div class="modal-inner">
     <p class="modal-eyebrow">MY SEAT</p>
     <h3 class="modal-title">내 프로필</h3>
-    <p class="modal-sub" id="meModalSub">이름·자음·색을 바꾸고, 쇼룸에서 나갈 수 있어요.</p>
+    <p class="modal-sub" id="meModalSub">이름과 캐릭터를 바꾸고, 쇼룸에서 나갈 수 있어요.</p>
     <div class="field">
       <span>이름</span>
       <input id="meNameInput" class="input" type="text" maxlength="12">
     </div>
     <div class="field">
-      <span>자음</span>
-      <input id="meConsonantInput" class="input input-consonant" type="text" maxlength="2">
-    </div>
-    <div class="field">
-      <span>컬러</span>
-      <div id="meColors" class="swatches" role="radiogroup" aria-label="캐릭터 색"></div>
+      <span>내 캐릭터</span>
+      <div id="meChars" class="charpick" role="radiogroup" aria-label="내 캐릭터"></div>
     </div>
     <div class="modal-actions space-between">
       <button type="button" class="btn btn-danger" id="leaveBtn">쇼룸 나가기</button>
@@ -247,7 +231,7 @@
 
     <div class="field">
       <span>차 색상</span>
-      <div id="decorColors" class="swatches decor-swatches" role="radiogroup" aria-label="차 색상"></div>
+      <div id="decorColors" class="decor-swatches" role="radiogroup" aria-label="차 색상"></div>
     </div>
 
     <div class="field">
@@ -275,6 +259,6 @@
   </div>
 </dialog>
 
-<script type="module" src="app.js?v=20261127e"></script>
+<script type="module" src="app.js?v=20261127clay2"></script>
 </body>
 </html>

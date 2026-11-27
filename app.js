@@ -33,10 +33,16 @@ const STATUSES = [
   { id: "away",    label: "자리 비움", color: "#7c8598" }
 ];
 
-const PALETTE = [
-  "#8b5cf6", "#37d39b", "#ff7a59", "#5fa8ff",
-  "#e6c48a", "#f06fa8", "#38c7c7", "#9aa3b2"
+/* 니케 SD 캐릭터 — 쇼룸에서 내 모습으로 세우는 다섯 명 */
+const CHARACTERS = [
+  { id: "scarlet",    name: "홍련:흑영", tag: "냉미녀 검객",   color: "#C0263C", img: "assets/char-scarlet.png" },
+  { id: "crown",      name: "크라운",     tag: "금빛 왕관 기사", color: "#C9932F", img: "assets/char-crown.png" },
+  { id: "cinderella", name: "신데렐라",   tag: "유리 구두",     color: "#7FA7D1", img: "assets/char-cinderella.png" },
+  { id: "redhood",    name: "레드후드",   tag: "붉은 사냥꾼",   color: "#D2352B", img: "assets/char-redhood.png" },
+  { id: "dorothy",    name: "도로시",     tag: "천사 날개",     color: "#E58BA8", img: "assets/char-dorothy.png" }
 ];
+const CHAR_BY_ID = Object.fromEntries(CHARACTERS.map(c => [c.id, c]));
+function charOf(id) { return CHAR_BY_ID[id] || null; }
 
 /* ---------------- 🎨 room decoration ---------------- */
 
@@ -79,20 +85,9 @@ const TASK_COLUMNS = [
 
 const ME_KEY = "showroom.me.v1";
 const LOCAL_KEY = "showroom.local.v1";
+const CHAR_PROMPT_KEY = "showroom.charpick.v1";
 const MSG_LIMIT = 80;
 
-/* ---------------- seasonal theme ---------------- */
-
-const SEASON_META = {
-  christmas: { emoji: "🎄", label: "크리스마스 시즌" },
-  winter:    { emoji: "❄️", label: "겨울 시즌" },
-  spring:    { emoji: "🌸", label: "봄·벚꽃 시즌" },
-  summer:    { emoji: "🌴", label: "여름 시즌" },
-  autumn:    { emoji: "🍂", label: "가을 시즌" },
-  halloween: { emoji: "🎃", label: "할로윈 시즌" }
-};
-
-let seasonMode = "auto";
 const STAGE = { api: null, mode: "pending" };
 
 /* light diagnostics: last errors + which stage mode is running (no personal data) */
@@ -155,8 +150,12 @@ function linkify(raw, names) {
 }
 
 function avatarHTML(person, cls = "") {
-  const color = person.color || "#8b5cf6";
-  const consonant = (person.consonant || "?").slice(0, 2);
+  const ch = charOf(person && person.character);
+  if (ch) {
+    return `<img class="avatar-img ${cls}" src="${ch.img}" alt="" loading="lazy">`;
+  }
+  const color = (person && person.color) || "#C9932F";
+  const consonant = ((person && person.consonant) || "?").slice(0, 2);
   return `<div class="critter ${cls}" style="--c:${escapeHtml(color)}" aria-hidden="true">
       <span class="eyes"></span><span class="consonant">${escapeHtml(consonant)}</span>
     </div>`;
@@ -260,7 +259,8 @@ async function fbStart() {
     applyDecorToStage(next);
     renderDecorUI();
     if (prev && next.updatedAt > prev.updatedAt && next.updatedBy &&
-        next.updatedBy !== prev.updatedBy) {
+        next.updatedBy !== prev.updatedBy &&
+        !(state.me && next.updatedBy === state.me.name)) {
       toast(`${next.updatedBy} 님이 공간을 꾸몄어요`);
     }
   }, onDbError);
@@ -286,6 +286,7 @@ function presencePayload() {
     name: me.name,
     consonant: me.consonant,
     color: me.color,
+    character: me.character || "",
     zone: me.zone,
     status: me.status,
     message: me.message || "",
@@ -379,6 +380,7 @@ async function savePresence() {
   else if (state.mode === "local") {
     LOCAL.data.presence[state.me.pid] = {
       name: state.me.name, consonant: state.me.consonant, color: state.me.color,
+      character: state.me.character || "",
       zone: state.me.zone, status: state.me.status, message: state.me.message || "",
       ts: Date.now()
     };
@@ -393,6 +395,7 @@ async function sendMessage(text) {
   const msg = {
     name: state.me.name, pid: state.me.pid,
     consonant: state.me.consonant, color: state.me.color,
+    character: state.me.character || "",
     text: body, createdAt: Date.now()
   };
   try {
@@ -416,7 +419,8 @@ async function addTask(title, assigneeName) {
     title: clean,
     assignee: assignee.name,
     assigneeConsonant: assignee.consonant || "",
-    assigneeColor: assignee.color || "#8b5cf6",
+    assigneeColor: assignee.color || "#C9932F",
+    assigneeCharacter: assignee.character || "",
     status: "todo",
     createdBy: state.me ? state.me.name : "게스트",
     createdAt: Date.now()
@@ -456,91 +460,86 @@ function resolvePerson(name) {
   const list = Object.values(state.people).concat(state.me ? [state.me] : []);
   const hit = list.find(p => p && p.name === name);
   if (hit) return hit;
-  return { name: name || (state.me ? state.me.name : "성희"), consonant: "ㅅ", color: "#8b5cf6" };
+  return { name: name || (state.me ? state.me.name : "성희"), consonant: "ㅅ", color: "#C9932F", character: "" };
 }
 
-/* ---------------- 3D stage ---------------- */
+/* ---------------- map stage (clay map) ---------------- */
 
-function webglAvailable() {
+const MOTION_KEY = "showroom.motion.v1";
+let motionOn = true;
+
+function loadMotionPref() {
   try {
-    const c = document.createElement("canvas");
-    return !!(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl")));
-  } catch (e) { return false; }
+    const v = localStorage.getItem(MOTION_KEY);
+    if (v === "off") return false;
+    if (v === "on") return true;
+  } catch (e) { /* ignore */ }
+  return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function autoSeasonId(now = new Date()) {
-  const m = now.getMonth() + 1;
-  const d = now.getDate();
-  if ((m === 11 && d >= 20) || m === 12) return "christmas";
-  if (m === 1 || m === 2) return "winter";
-  if (m >= 3 && m <= 5) return "spring";
-  if (m >= 6 && m <= 8) return "summer";
-  return "autumn";
-}
-
-function isLateOctober(now = new Date()) {
-  return now.getMonth() === 9 && now.getDate() >= 20;
-}
-
-function applySeason(mode = seasonMode) {
-  seasonMode = mode || "auto";
-  const auto = seasonMode === "auto";
-  const id = auto ? autoSeasonId() : seasonMode;
-  const halloween = id === "autumn" && isLateOctober();
-  const meta = halloween ? SEASON_META.halloween : SEASON_META[id];
-  const badge = $("seasonBadge");
-  if (badge) badge.textContent = `${meta.emoji} ${meta.label} ${auto ? "자동 적용" : "미리보기"}`;
-  const map = document.querySelector(".map");
-  if (map) map.dataset.season = id;
-  const stage = $("stage3d");
-  if (stage) stage.dataset.season = id;
-  const sel = $("seasonSelect");
-  if (sel && sel.value !== seasonMode) sel.value = seasonMode;
-  diag.season = id + (halloween ? "+halloween" : "");
-  if (STAGE.api) {
-    diag.sceneSeason = STAGE.api.setSeason(id, { halloween });
+function setMotion(on, persist) {
+  motionOn = !!on;
+  document.body.classList.toggle("no-motion", !motionOn);
+  const btn = $("motionBtn");
+  if (btn) {
+    btn.classList.toggle("is-on", motionOn);
+    btn.setAttribute("aria-pressed", String(motionOn));
+    btn.innerHTML = `✨ 움직임 <b>${motionOn ? "ON" : "OFF"}</b>`;
+  }
+  if (STAGE.api && STAGE.api.setMotion) STAGE.api.setMotion(motionOn);
+  if (persist) {
+    try { localStorage.setItem(MOTION_KEY, motionOn ? "on" : "off"); } catch (e) { /* ignore */ }
   }
 }
 
 async function initStage() {
-  const stage = $("stage3d");
-  const loading = $("stageLoading");
+  const stage = $("mapStage");
+  const loading = $("mapLoading");
   if (!stage) return;
+
   const fail = (reason) => {
     STAGE.mode = "2d";
     diag.mode = "2d";
-    stage.classList.add("is-fallback");
+    const img = $("mapImg");
+    if (img) img.hidden = true;
     const fb = $("stageFallback");
     if (fb) fb.hidden = false;
     const note = $("stageFallbackNote");
     if (note && reason) note.textContent = reason;
     if (loading) loading.hidden = true;
+    renderZones();
   };
-  if (!webglAvailable()) {
-    fail("이 브라우저에서 WebGL을 쓸 수 없어 2D 맵으로 보여드립니다.");
+
+  const img = $("mapImg");
+  const ready = await new Promise((resolve) => {
+    if (!img) return resolve(false);
+    let done = false;
+    const finish = (ok) => { if (!done) { done = true; resolve(ok); } };
+    if (img.complete) return finish(img.naturalWidth > 0);
+    img.addEventListener("load", () => finish(true), { once: true });
+    img.addEventListener("error", () => finish(false), { once: true });
+    setTimeout(() => finish(img.naturalWidth > 0), 6000);
+  });
+  if (!ready) {
+    fail("오피스 맵 이미지를 불러오지 못해 2D 맵으로 보여드립니다.");
     return;
   }
-  if (new URLSearchParams(location.search).get("stage") === "2d") {
-    fail("2D 맵으로 표시 중입니다 (저사양 모드).");
-    return;
-  }
+
   try {
-    const mod = await import("./showroom3d.js?v=20261127e");
-    STAGE.api = mod.createShowroom({
-      canvas: $("scene3d"),
-      container: stage,
-      reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    const mod = await import("./claymap.js?v=20261127clay2");
+    STAGE.api = mod.createClayMap({
+      root: stage,
+      zones: ZONES,
+      motion: motionOn,
       onPersonClick: (p) => {
         const bits = [p.name, p.statusLabel];
         if (p.message) bits.push(p.message);
         toast(bits.filter(Boolean).join(" · "));
-      },
-      onFail: () => fail("3D 쇼룸을 시작하지 못해 2D 맵으로 보여드립니다.")
+      }
     });
-    STAGE.mode = "3d";
-    diag.mode = "3d";
-    STAGE.api.focusZone("overview");
-    applySeason(seasonMode);
+    STAGE.mode = "clay";
+    diag.mode = "clay";
+    setMotion(motionOn);
     applyDecorToStage(state.decor);
     syncStage();
     if (loading) {
@@ -548,43 +547,32 @@ async function initStage() {
       setTimeout(() => { loading.hidden = true; }, 420);
     }
   } catch (err) {
-    console.warn("3D showroom unavailable", err);
-    if (diag.errors.length < 30) diag.errors.push("3d:" + String((err && err.message) || err));
-    fail("3D 쇼룸을 불러오지 못해 2D 맵으로 보여드립니다.");
+    console.warn("clay map unavailable", err);
+    if (diag.errors.length < 30) diag.errors.push("map:" + String((err && err.message) || err));
+    fail("오피스 맵을 준비하지 못해 2D 맵으로 보여드립니다.");
   }
 }
 
 function stagePeople() {
   return participantList()
     .filter(p => p && p.pid)
-    .map(p => ({
-      pid: p.pid,
-      name: p.name || "이름 없음",
-      consonant: p.consonant || "",
-      color: p.color || "#8b5cf6",
-      zone: p.zone || "showroom",
-      status: p.status || "idle",
-      statusLabel: statusOf(p.status).label,
-      statusColor: statusOf(p.status).color,
-      message: p.message || "",
-      isMe: !!(state.me && p.pid === state.me.pid)
-    }));
-}
-
-function renderZoneChips(people) {
-  const host = $("stageZoneList");
-  if (!host) return;
-  host.innerHTML = ZONES.map(z => {
-    const n = people.filter(p => p.zone === z.id).length;
-    return `<button class="zone-chip" type="button" data-zone="${z.id}" aria-label="${z.name} 시점으로 보기, ${n}명">
-      <span aria-hidden="true">${z.icon}</span><span>${z.name}</span><span class="zc-count">${n}</span></button>`;
-  }).join("");
-  host.querySelectorAll(".zone-chip").forEach(chip => {
-    chip.addEventListener("click", () => {
-      if (STAGE.api) STAGE.api.focusZone(chip.dataset.zone);
-      toast(`${zoneOf(chip.dataset.zone).name} 시점`);
+    .map(p => {
+      const ch = charOf(p.character);
+      return {
+        pid: p.pid,
+        name: p.name || "이름 없음",
+        consonant: p.consonant || "",
+        color: p.color || "#C9932F",
+        character: ch ? ch.id : "",
+        characterImg: ch ? ch.img : "",
+        zone: p.zone || "showroom",
+        status: p.status || "idle",
+        statusLabel: statusOf(p.status).label,
+        statusColor: statusOf(p.status).color,
+        message: p.message || "",
+        isMe: !!(state.me && p.pid === state.me.pid)
+      };
     });
-  });
 }
 
 function updateDock() {
@@ -600,9 +588,13 @@ function updateDock() {
   me.hidden = false;
   const critter = $("dockCritter");
   if (critter) {
-    critter.style.setProperty("--c", state.me.color || "#8b5cf6");
-    const cons = critter.querySelector(".consonant");
-    if (cons) cons.textContent = (state.me.consonant || "?").slice(0, 2);
+    const ch = charOf(state.me.character);
+    if (ch) {
+      critter.innerHTML = `<img src="${ch.img}" alt="">`;
+    } else {
+      critter.style.setProperty("--c", state.me.color || "#C9932F");
+      critter.innerHTML = `<span class="eyes"></span><span class="consonant">${escapeHtml((state.me.consonant || "?").slice(0, 2))}</span>`;
+    }
   }
   const nm = $("dockName");
   if (nm) nm.textContent = state.me.name;
@@ -622,9 +614,40 @@ function updateDock() {
 function syncStage() {
   const people = stagePeople();
   diag.people = people.length;
-  renderZoneChips(people);
   if (STAGE.api) STAGE.api.syncPeople(people);
   updateDock();
+  paintStats(people);
+}
+
+function paintStats(people) {
+  const list = people || stagePeople();
+  const countIn = (id) => list.filter(p => (p.zone || "showroom") === id).length;
+  const occupied = ZONES.filter(z => countIn(z.id) > 0).length;
+
+  const roomStat = $("roomStat");
+  if (roomStat) {
+    roomStat.classList.toggle("has-people", occupied > 0);
+    const label = roomStat.querySelector("span");
+    if (label) label.textContent = `${occupied}개 방 가동`;
+  }
+  const peopleStat = $("peopleStat");
+  if (peopleStat) {
+    const label = peopleStat.querySelector("span:last-child");
+    if (label) label.textContent = `ON ${list.length}명`;
+  }
+
+  const title = $("helloTitle");
+  if (title) {
+    title.textContent = list.length
+      ? `대장님, 비서 ${list.length}명이 대기 중이에요`
+      : "대장님, 아직 비서가 없어요";
+  }
+  const sub = $("helloSub");
+  if (sub) {
+    sub.innerHTML = list.length
+      ? ZONES.map(z => `<span class="zstat"><span aria-hidden="true">${z.icon}</span>${z.name} <b>${countIn(z.id)}</b></span>`).join("")
+      : "아래 방을 눌러 들어가면 내 캐릭터가 그 자리에 섭니다.";
+  }
 }
 
 /* ---------------- 🎨 shared room decoration ---------------- */
@@ -702,19 +725,25 @@ function renderDecorUI() {
   const swatchHost = $("decorColors");
   if (swatchHost) {
     swatchHost.querySelectorAll(".decor-swatch").forEach((sw) => {
-      sw.setAttribute("aria-checked", String(sw.dataset.hex.toLowerCase() === d.carColor));
+      const on = sw.dataset.hex.toLowerCase() === d.carColor;
+      sw.setAttribute("aria-checked", String(on));
+      sw.classList.toggle("is-on", on);
     });
   }
   const lightHost = $("decorLights");
   if (lightHost) {
     lightHost.querySelectorAll("[data-tone]").forEach((ch) => {
-      ch.setAttribute("aria-checked", String(ch.dataset.tone === d.lightTone));
+      const on = ch.dataset.tone === d.lightTone;
+      ch.setAttribute("aria-checked", String(on));
+      ch.classList.toggle("is-on", on);
     });
   }
   const propHost = $("decorProps");
   if (propHost) {
     propHost.querySelectorAll("[data-prop]").forEach((ch) => {
-      ch.setAttribute("aria-pressed", String(!!d.props[ch.dataset.prop]));
+      const on = !!d.props[ch.dataset.prop];
+      ch.setAttribute("aria-pressed", String(on));
+      ch.classList.toggle("is-on", on);
     });
   }
   const banner = $("decorBanner");
@@ -740,7 +769,7 @@ function buildDecorControls() {
   const swatchHost = $("decorColors");
   if (swatchHost) {
     swatchHost.innerHTML = DECOR_CAR_COLORS.map((c) => `
-      <button class="swatch decor-swatch" type="button" role="radio" aria-checked="false"
+      <button class="decor-swatch" type="button" role="radio" aria-checked="false"
         style="background:${c.hex}" data-hex="${c.hex}" title="${c.label}" aria-label="차 색상 ${c.label}"></button>`).join("");
     swatchHost.querySelectorAll(".decor-swatch").forEach((sw) => {
       sw.addEventListener("click", () => saveDecor({ carColor: sw.dataset.hex }));
@@ -862,6 +891,7 @@ function renderZones() {
 
   const people = participantList();
   const host = $("zones");
+  if (!host) { syncStage(); return; }
   host.innerHTML = ZONES.map(zone => {
     const members = people
       .filter(p => (p.zone || "showroom") === zone.id)
@@ -939,11 +969,17 @@ function renderMentions() {
   const host = $("mentionChips");
   const people = participantList().filter(p => p.name);
   if (!people.length) { host.innerHTML = `<span class="head-hint">입장한 피클이 없습니다</span>`; return; }
-  host.innerHTML = people.map(p => `
+  host.innerHTML = people.map(p => {
+    const ch = charOf(p.character);
+    const face = ch
+      ? `<img src="${ch.img}" alt="">`
+      : escapeHtml((p.consonant || "?").slice(0, 1));
+    return `
     <button class="mchip" type="button" data-name="${escapeHtml(p.name)}">
-      <span class="dot-av" style="background:${escapeHtml(p.color || "#8b5cf6")}">${escapeHtml((p.consonant || "?").slice(0, 1))}</span>
+      <span class="dot-av" style="background:${escapeHtml(p.color || "#C9932F")}">${face}</span>
       @${escapeHtml(p.name)}
-    </button>`).join("");
+    </button>`;
+  }).join("");
   host.querySelectorAll(".mchip").forEach(chip => {
     chip.addEventListener("click", () => insertMention(chip.dataset.name));
   });
@@ -978,7 +1014,7 @@ function renderChat() {
   feed.innerHTML = state.messages.map(m => {
     const isMe = mePid && m.pid === mePid;
     return `<div class="msg${isMe ? " is-me" : ""}">
-      ${avatarHTML({ color: m.color, consonant: m.consonant }, "sm")}
+      ${avatarHTML({ color: m.color, consonant: m.consonant, character: m.character }, "sm")}
       <div class="msg-body">
         <div class="msg-top">
           <span class="msg-name">${escapeHtml(m.name || "익명")}</span>
@@ -1069,7 +1105,11 @@ function taskHTML(t) {
     </div>
     <div class="tcard-meta">
       <span class="tassignee">
-        <span class="dot-av" style="background:${escapeHtml(t.assigneeColor || "#8b5cf6")}">${escapeHtml((t.assigneeConsonant || "?").slice(0, 1))}</span>
+        ${(() => {
+          const ch = charOf(t.assigneeCharacter);
+          const face = ch ? `<img src="${ch.img}" alt="">` : escapeHtml((t.assigneeConsonant || "?").slice(0, 1));
+          return `<span class="dot-av" style="background:${escapeHtml(t.assigneeColor || "#C9932F")}">${face}</span>`;
+        })()}
         @${escapeHtml(t.assignee || "미정")}
       </span>
       <span class="tcard-actions">
@@ -1087,13 +1127,19 @@ function renderMe() {
   const av = $("meAvatar");
   const nm = $("meName");
   if (state.me) {
-    av.textContent = (state.me.consonant || "?").slice(0, 1);
-    av.style.background = state.me.color || "#8b5cf6";
+    const ch = charOf(state.me.character);
+    if (ch) {
+      av.innerHTML = `<img src="${ch.img}" alt="">`;
+      av.style.background = "#F6E8D6";
+    } else {
+      av.textContent = (state.me.consonant || "?").slice(0, 1);
+      av.style.background = state.me.color || "#C9932F";
+    }
     nm.textContent = state.me.name;
     btn.title = "내 프로필";
   } else {
     av.textContent = "?";
-    av.style.background = "#4b5464";
+    av.style.background = "#D9C3A5";
     nm.textContent = "입장";
     btn.title = "쇼룸 입장";
   }
@@ -1116,7 +1162,8 @@ function loadMe() {
     if (!me || !me.pid || !me.name) return null;
     return {
       pid: me.pid, name: me.name, consonant: me.consonant || "ㅅ",
-      color: me.color || "#8b5cf6",
+      color: me.color || "#C9932F",
+      character: me.character || "",
       zone: me.zone || "showroom", status: me.status || "idle", message: me.message || ""
     };
   } catch (e) { return null; }
@@ -1124,35 +1171,51 @@ function loadMe() {
 
 /* ---------------- join modal ---------------- */
 
-const joinDraft = { name: "성희", consonant: "ㅅ", color: PALETTE[0] };
+const joinDraft = { name: "", character: "scarlet" };
+let meCharDraft = "";
 
-function buildSwatches(host, selected, onPick) {
-  host.innerHTML = PALETTE.map(c => `
-    <button class="swatch" type="button" role="radio" aria-checked="${c === selected}"
-      style="background:${c}" data-color="${c}" aria-label="색 ${c}"></button>`).join("");
-  host.querySelectorAll(".swatch").forEach(sw => {
-    sw.addEventListener("click", () => {
-      host.querySelectorAll(".swatch").forEach(x => x.setAttribute("aria-checked", "false"));
-      sw.setAttribute("aria-checked", "true");
-      onPick(sw.dataset.color);
+function buildCharPick(host, selected, onPick) {
+  if (!host) return;
+  host.innerHTML = CHARACTERS.map(c => `
+    <button class="char-card${c.id === selected ? " is-on" : ""}" type="button" role="radio"
+      aria-checked="${c.id === selected}" data-char="${c.id}" aria-label="${escapeHtml(c.name)}">
+      <img src="${c.img}" alt="" loading="lazy" draggable="false">
+      <b>${escapeHtml(c.name)}</b>
+      <em>${escapeHtml(c.tag)}</em>
+    </button>`).join("");
+  host.querySelectorAll(".char-card").forEach(card => {
+    card.addEventListener("click", () => {
+      host.querySelectorAll(".char-card").forEach(x => {
+        const on = x === card;
+        x.classList.toggle("is-on", on);
+        x.setAttribute("aria-checked", String(on));
+      });
+      onPick(card.dataset.char);
     });
   });
 }
 
 function paintJoinPreview() {
-  $("joinPreview").style.setProperty("--c", joinDraft.color);
-  $("joinPreview").querySelector(".consonant").textContent = (joinDraft.consonant || "?").slice(0, 2);
-  $("joinPreviewText").textContent = `${joinDraft.name || "이름"} · ${joinDraft.consonant || "?"}`;
+  const ch = charOf(joinDraft.character);
+  const fig = $("joinPreview");
+  if (fig) {
+    if (ch) {
+      fig.style.setProperty("--c", ch.color);
+      fig.innerHTML = `<img src="${ch.img}" alt="">`;
+    } else {
+      fig.innerHTML = `<span class="eyes"></span><span class="consonant">${escapeHtml((joinDraft.name || "?").slice(0, 1))}</span>`;
+    }
+  }
+  const txt = $("joinPreviewText");
+  if (txt) txt.textContent = `${joinDraft.name || "이름"} · ${ch ? ch.name : "기본 피클"}`;
 }
 
 function openJoin(prefill) {
   const base = prefill || state.me || joinDraft;
-  joinDraft.name = base.name || "성희";
-  joinDraft.consonant = base.consonant || "ㅅ";
-  joinDraft.color = base.color || PALETTE[0];
+  joinDraft.name = base.name || "";
+  joinDraft.character = base.character || joinDraft.character || "scarlet";
   $("joinName").value = joinDraft.name;
-  $("joinConsonant").value = joinDraft.consonant;
-  buildSwatches($("joinColors"), joinDraft.color, (c) => { joinDraft.color = c; paintJoinPreview(); });
+  buildCharPick($("joinChars"), joinDraft.character, (id) => { joinDraft.character = id; paintJoinPreview(); });
   paintJoinPreview();
   $("joinTitle").textContent = state.me ? "내 자리 바꾸기" : "쇼룸 입장";
   $("joinSubmit").textContent = state.me ? "저장" : "입장하기";
@@ -1163,11 +1226,14 @@ function openJoin(prefill) {
 
 async function commitJoin() {
   const name = ($("joinName").value || "").trim().slice(0, 12) || joinDraft.name;
-  const consonant = ($("joinConsonant").value || "").trim().slice(0, 2) || "ㅅ";
+  const ch = charOf(joinDraft.character);
   const prev = state.me;
   state.me = {
     pid: prev ? prev.pid : uid("p"),
-    name, consonant, color: joinDraft.color,
+    name,
+    character: ch ? ch.id : (prev ? prev.character : ""),
+    consonant: (name || "ㅅ").slice(0, 1),
+    color: ch ? ch.color : (prev ? prev.color : "#C9932F"),
     zone: prev ? prev.zone : "showroom",
     status: prev ? prev.status : "idle",
     message: prev ? prev.message : ""
@@ -1177,6 +1243,16 @@ async function commitJoin() {
   renderMe(); renderZones(); renderMentions(); renderAssigneeOptions();
   await savePresence();
   toast(`${name} 님, 쇼룸에 섰습니다`);
+}
+
+function openMe() {
+  if (!state.me) { openJoin(); return; }
+  $("meNameInput").value = state.me.name;
+  $("meModalSub").textContent = `${zoneOf(state.me.zone).name} · ${statusOf(state.me.status).label}`;
+  meCharDraft = state.me.character || "scarlet";
+  buildCharPick($("meChars"), meCharDraft, (id) => { meCharDraft = id; });
+  const dlg = $("meModal");
+  if (!dlg.open) dlg.showModal();
 }
 
 /* ---------------- invite modal ---------------- */
@@ -1194,16 +1270,22 @@ function openInvite() {
 
 ${url}
 
-위 링크를 열고 네 이름·자음·색을 넣어 입장해 줘.
+위 링크를 열고 내 이름을 쓰고, 니케 캐릭터 다섯 명 중 하나를 골라 입장해 줘.
+· 🗡️ 홍련:흑영 — 냉미녀 검객
+· 👑 크라운 — 금빛 왕관 기사
+· 🧊 신데렐라 — 유리 구두
+· 🔥 레드후드 — 붉은 사냥꾼
+· 🪽 도로시 — 천사 날개
+
 입장하면 세 구역을 오갈 수 있어.
 · 🚘 메인 쇼룸 — 전시·메인 업무
 · 🤝 상담 테이블 — 회의·미팅
 · ☕ 고객 라운지 — 대기·모니터링
 
-카드에서 내 상태(대기 중·작업 중·감시 중·회의 중·자리 비움)와 상태 메시지를 바꾸고,
-채팅에서 "@이름 할 일" 처럼 멘션으로 서로 일을 시키면 돼.
-채팅 메시지의 '＋ 보드' 를 누르면 할 일 보드로 바로 올라가.
-쇼룸 위의 '🎨 공간 꾸미기' 를 열면 차 색·조명 톤·배너 문구·3D 소품을 함께 바꿀 수 있어 —
+아래 '내 자리' 에서 내 상태(대기 중·작업 중·감시 중·회의 중·자리 비움)와 상태 메시지를 바꾸고,
+회의실에서 "@이름 할 일" 처럼 멘션으로 서로 일을 시키면 돼.
+메시지의 '＋ 보드' 를 누르면 작업실 보드로 바로 올라가.
+쇼룸 위의 '🎨 공간 꾸미기' 를 열면 차 색·조명 톤·배너 문구·소품을 함께 바꿀 수 있어 —
 바꾸는 즉시 모두의 화면에 반영돼.
 
 지금은 ${ROOM_TITLE} 이야. 같이 하자!`;
@@ -1249,23 +1331,22 @@ function wireEvents() {
   $("inviteClose").addEventListener("click", () => $("inviteModal").close());
 
   $("meBtn").addEventListener("click", () => {
-    if (!state.me) { openJoin(); return; }
-    $("meNameInput").value = state.me.name;
-    $("meConsonantInput").value = state.me.consonant;
-    $("meModalSub").textContent = `${zoneOf(state.me.zone).name} · ${statusOf(state.me.status).label}`;
-    buildSwatches($("meColors"), state.me.color, (c) => { state.me.color = c; });
-    $("meModal").showModal();
+    openMe();
   });
   $("meCancel").addEventListener("click", () => $("meModal").close());
   $("meSave").addEventListener("click", async () => {
     if (!state.me) return;
     const name = ($("meNameInput").value || "").trim().slice(0, 12) || state.me.name;
-    const consonant = ($("meConsonantInput").value || "").trim().slice(0, 2) || state.me.consonant;
+    const ch = charOf(meCharDraft) || charOf(state.me.character);
     state.me.name = name;
-    state.me.consonant = consonant;
+    state.me.consonant = name.slice(0, 1);
+    if (ch) {
+      state.me.character = ch.id;
+      state.me.color = ch.color;
+    }
     persistMe();
     $("meModal").close();
-    renderMe(); renderZones(); renderMentions();
+    renderMe(); renderZones(); renderMentions(); renderAssigneeOptions();
     await savePresence();
     toast("프로필을 저장했습니다");
   });
@@ -1290,10 +1371,6 @@ function wireEvents() {
     joinDraft.name = $("joinName").value.trim();
     paintJoinPreview();
   });
-  $("joinConsonant").addEventListener("input", () => {
-    joinDraft.consonant = $("joinConsonant").value.trim();
-    paintJoinPreview();
-  });
   $("joinCancel").addEventListener("click", () => {
     $("joinModal").close();
     if (!state.me) {
@@ -1313,21 +1390,33 @@ function wireEvents() {
   $("inviteUrl").addEventListener("focus", (e) => e.target.select());
   $("inviteText").addEventListener("focus", (e) => e.target.select());
 
-  /* ---- 3D stage controls ---- */
+  /* ---- tabs / motion / dock ---- */
   buildDecorControls();
-  const seasonSel = $("seasonSelect");
-  if (seasonSel) {
-    seasonSel.addEventListener("change", () => applySeason(seasonSel.value));
+  const tabButtons = Array.from(document.querySelectorAll(".tab"));
+  function setView(view) {
+    document.body.dataset.view = view;
+    tabButtons.forEach(t => {
+      const on = t.dataset.view === view;
+      t.classList.toggle("is-on", on);
+      t.setAttribute("aria-selected", String(on));
+    });
+    if (window.matchMedia("(min-width:1060px)").matches) {
+      const panel = document.querySelector(`.panel[data-panel="${view}"]`);
+      if (panel) panel.scrollIntoView({ behavior: motionOn ? "smooth" : "auto", block: "start" });
+    } else {
+      window.scrollTo({ top: 0, behavior: motionOn ? "smooth" : "auto" });
+    }
   }
-  const presets = $("cameraPresets");
-  if (presets) {
-    presets.querySelectorAll(".cam-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        if (STAGE.api) STAGE.api.focusZone(btn.dataset.cam);
-        presets.querySelectorAll(".cam-btn").forEach(b => b.classList.toggle("is-active", b === btn));
-      });
+  tabButtons.forEach(tab => tab.addEventListener("click", () => setView(tab.dataset.view)));
+
+  const motionBtn = $("motionBtn");
+  if (motionBtn) {
+    motionBtn.addEventListener("click", () => {
+      setMotion(!motionOn, true);
+      toast(motionOn ? "움직임을 켰어요" : "움직임을 멈췄어요");
     });
   }
+
   const dockJoin = $("dockJoin");
   if (dockJoin) dockJoin.addEventListener("click", () => openJoin());
 
@@ -1382,15 +1471,16 @@ function wireEvents() {
 function renderAll() {
   renderMe(); renderZones(); renderChat(); renderBoard(); renderMentions(); renderAssigneeOptions();
   paintConn();
+  paintStats();
 }
 
 async function boot() {
   wireEvents();
   state.me = loadMe();
   state.decor = normalizeDecor(null);
+  setMotion(loadMotionPref(), false);
   renderAll();
   renderDecorUI();
-  applySeason("auto");
   initStage();
 
   try {
@@ -1407,7 +1497,19 @@ async function boot() {
     startLocal(e && e.message);
   }
 
-  if (!state.me) openJoin();
+  if (!state.me) {
+    openJoin();
+  } else if (!state.me.character && !charPromptShown()) {
+    markCharPrompt();
+    setTimeout(openMe, 900);
+  }
+}
+
+function charPromptShown() {
+  try { return localStorage.getItem(CHAR_PROMPT_KEY) === "1"; } catch (e) { return true; }
+}
+function markCharPrompt() {
+  try { localStorage.setItem(CHAR_PROMPT_KEY, "1"); } catch (e) { /* ignore */ }
 }
 
 boot();
