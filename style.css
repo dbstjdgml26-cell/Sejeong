@@ -643,10 +643,10 @@ body{
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
 }
 .c3d-dot{width:7px;height:7px;border-radius:50%;box-shadow:0 0 8px 1px currentColor;flex:none}
-.c3d-name{font-size:11.5px;font-weight:700;color:#f2f5fa;letter-spacing:-.01em;font-family:var(--font)}
+.c3d-name{font-size:11px;font-weight:700;color:#f2f5fa;letter-spacing:-.01em;font-family:var(--font)}
 .c3d-status{
-  display:inline-block;font-size:9.5px;font-weight:700;white-space:nowrap;
-  padding:1px 6px;border-radius:999px;border:1px solid transparent;
+  display:inline-block;font-size:9px;font-weight:700;white-space:nowrap;
+  padding:1px 5px;border-radius:999px;border:1px solid transparent;
   font-family:var(--font);
 }
 .c3d-msg{
