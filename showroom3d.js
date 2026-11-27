@@ -1383,7 +1383,7 @@ export function createShowroom(opts = {}) {
     const R = 0.37;
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(R, H - R * 2, 8, 26), bodyMat);
     body.position.y = H / 2 + 0.02;
-    body.castShadow = true;
+    body.castShadow = false;
     group.add(body);
 
     const eyeMat = new THREE.MeshStandardMaterial({ color: 0x121019, roughness: 0.24, metalness: 0.05 });
@@ -1400,7 +1400,7 @@ export function createShowroom(opts = {}) {
 
     // little feet shadow
     const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.34, 20), new THREE.MeshBasicMaterial({
-      color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false
+      color: 0x000000, transparent: true, opacity: 0.26, depthWrite: false
     }));
     shadow.rotation.x = -Math.PI / 2;
     shadow.position.y = 0.01;
