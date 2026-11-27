@@ -44,7 +44,7 @@ const CHAR_SCALE = 1.14;
 const CAMERAS = {
   overview: { pos: [0.3, 6.1, 12.6], target: [0, 1.4, 1.1] },
   showroom: { pos: [3.6, 3.5, 9.9], target: [0, 1.15, 1.0] },
-  desk: { pos: [10.4, 3.6, 7.8], target: [5.7, 1.05, 1.2] },
+  desk: { pos: [8.0, 3.3, 8.2], target: [5.6, 1.0, 1.1] },
   lounge: { pos: [-1.4, 3.3, 7.8], target: [-5.9, 1.05, 1.2] }
 };
 
@@ -506,17 +506,17 @@ export function createShowroom(opts = {}) {
     g.add(shoulderR);
 
     // wheels
-    const tireGeo = new THREE.CylinderGeometry(0.455, 0.455, 0.30, 30);
-    const rimGeo = new THREE.CylinderGeometry(0.245, 0.245, 0.30, 26);
-    const rimLipGeo = new THREE.TorusGeometry(0.255, 0.032, 8, 28);
+    const tireGeo = new THREE.TorusGeometry(0.375, 0.088, 12, 30);
+    const rimGeo = new THREE.CylinderGeometry(0.268, 0.268, 0.17, 26);
+    const rimLipGeo = new THREE.TorusGeometry(0.262, 0.028, 8, 28);
     const tireMat = new THREE.MeshStandardMaterial({ color: 0x08090c, roughness: 0.96, metalness: 0.04 });
     const rimMat = new THREE.MeshStandardMaterial({ color: 0xc2cad6, metalness: 0.95, roughness: 0.28 });
-    const discMat = new THREE.MeshStandardMaterial({ color: 0x1a1e26, metalness: 0.7, roughness: 0.45 });
-    const spokeGeo = new THREE.BoxGeometry(0.4, 0.062, 0.05);
+    const discMat = new THREE.MeshStandardMaterial({ color: 0x22262e, metalness: 0.75, roughness: 0.42 });
+    const spokeGeo = new THREE.BoxGeometry(0.44, 0.062, 0.05);
     const caliperMat = new THREE.MeshStandardMaterial({ color: 0xe0a850, metalness: 0.7, roughness: 0.35, emissive: 0x2a1a04 });
-    [[1.42, 0.92], [1.42, -0.92], [-1.42, 0.92], [-1.42, -0.92]].forEach(([x, z]) => {
+    [[1.42, 0.95], [1.42, -0.95], [-1.42, 0.95], [-1.42, -0.95]].forEach(([x, z]) => {
       const w = new THREE.Group();
-      w.position.set(x, 0.455, z);
+      w.position.set(x, 0.465, z);
       const side = z > 0 ? 1 : -1;
       const tire = new THREE.Mesh(tireGeo, tireMat);
       tire.rotation.x = Math.PI / 2;
@@ -524,25 +524,27 @@ export function createShowroom(opts = {}) {
       w.add(tire);
       const disc = new THREE.Mesh(rimGeo, discMat);
       disc.rotation.x = Math.PI / 2;
-      disc.position.z = side * 0.03;
       w.add(disc);
       const lip = new THREE.Mesh(rimLipGeo, rimMat);
       lip.rotation.x = Math.PI / 2;
-      lip.position.z = side * 0.125;
+      lip.position.z = side * 0.075;
       w.add(lip);
       for (let i = 0; i < 5; i++) {
         const spoke = new THREE.Mesh(spokeGeo, rimMat);
         spoke.rotation.z = (i / 5) * TAU;
-        spoke.position.z = side * 0.13;
+        spoke.position.z = side * 0.085;
         w.add(spoke);
       }
-      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.04, 14), rimMat);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.05, 14), rimMat);
       hub.rotation.x = Math.PI / 2;
-      hub.position.z = side * 0.145;
+      hub.position.z = side * 0.095;
       w.add(hub);
       const caliper = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.19, 0.06), caliperMat);
-      caliper.position.set(-0.02, 0.2, side * 0.055);
+      caliper.position.set(-0.02, 0.19, side * 0.05);
       w.add(caliper);
+      const arch = new THREE.Mesh(new THREE.TorusGeometry(0.49, 0.045, 8, 20, Math.PI), trim);
+      arch.position.z = side * 0.055;
+      w.add(arch);
       g.add(w);
     });
 
